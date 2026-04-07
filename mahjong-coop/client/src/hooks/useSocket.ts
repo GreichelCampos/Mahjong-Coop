@@ -54,7 +54,6 @@ export const useSocket = () => {
   };
 
   return {
-    socket: socketRef.current,
     gameState,
     isConnected,
     joinGame,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Board from './components/Board';
 import ControlBar from './components/ControlBar';
 import LiveChart from './components/LiveChart';
@@ -38,14 +38,32 @@ function App() {
   const [combo, setCombo] = useState(0);
   const [clicks, setClicks] = useState(0);
   const [matches, setMatches] = useState(0);
-  const [gameOver, setGameOver] = useState<'win' | 'lose' | null>(null);
   const [opponents, setOpponents] = useState<Opponent[]>([]);
   const [scoreHistory, setScoreHistory] = useState<ScorePoint[]>([]);
   const [activeTheme, setActiveTheme] = useState<TableTheme>(TABLE_THEMES[0]);
 
   const displayName = playerName || 'Tu';
 
-  const startNewGame = () => {
+  const gameOver = useMemo<'win' | 'lose' | null>(() => {
+    if (screen !== 'playing' || tiles.length === 0) {
+      return null;
+    }
+
+    const remainingActiveTiles = tiles.filter((tile) => !tile.isMatched);
+
+    if (remainingActiveTiles.length === 0) {
+      return 'win';
+    }
+
+    const selectableTiles = remainingActiveTiles.filter((tile) => isSelectable(tile, tiles));
+    const hasMoves = selectableTiles.some((firstTile, firstIndex) =>
+      selectableTiles.slice(firstIndex + 1).some((secondTile) => areMatching(firstTile, secondTile)),
+    );
+
+    return hasMoves ? null : 'lose';
+  }, [screen, tiles]);
+
+  const startNewGame = useCallback(() => {
     const nextTiles = createTiles();
     const nextOpponents = createOpponents(playerCount);
     const initialScorePoint = nextOpponents.reduce<ScorePoint>(
@@ -61,10 +79,9 @@ function App() {
     setCombo(0);
     setClicks(0);
     setMatches(0);
-    setGameOver(null);
     setOpponents(nextOpponents);
     setScoreHistory([initialScorePoint]);
-  };
+  }, [displayName, playerCount]);
 
   useEffect(() => {
     if (screen === 'lobby' && currentPlayers < playerCount) {
@@ -83,8 +100,6 @@ function App() {
       return undefined;
     }
 
-    setLoadingProgress(0);
-
     const interval = window.setInterval(() => {
       setLoadingProgress((previous) => {
         if (previous >= 100) {
@@ -99,7 +114,7 @@ function App() {
     }, 120);
 
     return () => window.clearInterval(interval);
-  }, [screen, playerCount]);
+  }, [screen, startNewGame]);
 
   useEffect(() => {
     if (screen !== 'playing' || gameOver) {
@@ -107,11 +122,30 @@ function App() {
     }
 
     const interval = window.setInterval(() => {
-      setTime((previous) => previous + 1);
+      setTime((previous) => {
+        const nextTime = previous + 1;
+
+        if (nextTime % 2 === 0) {
+          const point = opponents.reduce<ScorePoint>(
+            (accumulator, opponent) => ({ ...accumulator, [opponent.name]: opponent.score }),
+            { time: nextTime, [displayName]: score },
+          );
+
+          setScoreHistory((previousHistory) => {
+            if (previousHistory.at(-1)?.time === nextTime) {
+              return previousHistory;
+            }
+
+            return [...previousHistory.slice(-29), point];
+          });
+        }
+
+        return nextTime;
+      });
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [screen, gameOver]);
+  }, [screen, gameOver, displayName, score, opponents]);
 
   useEffect(() => {
     if (screen !== 'playing' || gameOver || opponents.length === 0) {
@@ -129,47 +163,6 @@ function App() {
 
     return () => window.clearInterval(interval);
   }, [screen, opponents.length, gameOver]);
-
-  useEffect(() => {
-    if (screen !== 'playing' || gameOver || time % 2 !== 0) {
-      return;
-    }
-
-    const point = opponents.reduce<ScorePoint>(
-      (accumulator, opponent) => ({ ...accumulator, [opponent.name]: opponent.score }),
-      { time, [displayName]: score },
-    );
-
-    setScoreHistory((previous) => {
-      if (previous.at(-1)?.time === time) {
-        return previous;
-      }
-
-      return [...previous.slice(-29), point];
-    });
-  }, [screen, gameOver, time, score, opponents, displayName]);
-
-  useEffect(() => {
-    if (screen !== 'playing' || tiles.length === 0) {
-      return;
-    }
-
-    const remainingTiles = tiles.filter((tile) => !tile.isMatched);
-
-    if (remainingTiles.length === 0) {
-      setGameOver('win');
-      return;
-    }
-
-    const selectableTiles = remainingTiles.filter((tile) => isSelectable(tile, tiles));
-    const hasMoves = selectableTiles.some((firstTile, firstIndex) =>
-      selectableTiles.slice(firstIndex + 1).some((secondTile) => areMatching(firstTile, secondTile)),
-    );
-
-    if (!hasMoves) {
-      setGameOver('lose');
-    }
-  }, [screen, tiles]);
 
   const handleConfirmName = () => {
     if (!tempName.trim()) {
@@ -374,7 +367,10 @@ function App() {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onCopyCode={handleCopyCode}
-          onStartMatch={() => setScreen('loading')}
+          onStartMatch={() => {
+            setLoadingProgress(0);
+            setScreen('loading');
+          }}
           onBackToMenu={handleBackToMenu}
         />
       </main>
