@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { createGame, addPlayer, removePlayer, selectTile } from "./game";
+import { createGame, addPlayer, removePlayer, selectTile } from "./game.js";
 
 let gameState = createGame(15);
 
