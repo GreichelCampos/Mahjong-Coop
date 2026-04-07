@@ -112,10 +112,13 @@ export function createTiles() {
   const symbols = shuffle(SYMBOLS);
 
   return positions.map((position, index): Tile => ({
-    id: index,
+    id: String(index),
+    symbol: `${symbols[index].label}`,
+    isFlipped: false,
+    lockedBy: null,
+    isMatched: false,
     ...position,
     ...symbols[index],
-    isMatched: false,
     isSelected: false,
     isHinted: false,
   }));
@@ -131,9 +134,9 @@ export function isSelectable(tile: Tile, allTiles: Tile[]) {
   const hasTop = activeTiles.some(
     (currentTile) =>
       currentTile.id !== tile.id &&
-      currentTile.z > tile.z &&
-      Math.abs(currentTile.x - tile.x) < 1 &&
-      Math.abs(currentTile.y - tile.y) < 1,
+      currentTile.z! > tile.z! &&
+      Math.abs(currentTile.x! - tile.x!) < 1 &&
+      Math.abs(currentTile.y! - tile.y!) < 1,
   );
 
   if (hasTop) {
@@ -144,18 +147,18 @@ export function isSelectable(tile: Tile, allTiles: Tile[]) {
     (currentTile) =>
       currentTile.id !== tile.id &&
       currentTile.z === tile.z &&
-      currentTile.x <= tile.x - 1 &&
-      currentTile.x > tile.x - 2 &&
-      Math.abs(currentTile.y - tile.y) < 1,
+      currentTile.x! <= tile.x! - 1 &&
+      currentTile.x! > tile.x! - 2 &&
+      Math.abs(currentTile.y! - tile.y!) < 1,
   );
 
   const hasRight = activeTiles.some(
     (currentTile) =>
       currentTile.id !== tile.id &&
       currentTile.z === tile.z &&
-      currentTile.x >= tile.x + 1 &&
-      currentTile.x < tile.x + 2 &&
-      Math.abs(currentTile.y - tile.y) < 1,
+      currentTile.x! >= tile.x! + 1 &&
+      currentTile.x! < tile.x! + 2 &&
+      Math.abs(currentTile.y! - tile.y!) < 1,
   );
 
   return !hasLeft || !hasRight;
@@ -176,7 +179,7 @@ export function areMatching(firstTile: Tile, secondTile: Tile) {
 export function getAvailablePairsCount(tiles: Tile[]) {
   const selectableTiles = tiles.filter((tile) => isSelectable(tile, tiles));
   let pairs = 0;
-  const seenIds = new Set<number>();
+  const seenIds = new Set<string>();
 
   for (let firstIndex = 0; firstIndex < selectableTiles.length; firstIndex += 1) {
     const firstTile = selectableTiles[firstIndex];
