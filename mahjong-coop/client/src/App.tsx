@@ -25,10 +25,10 @@ const PLAYER_COLORS = ['#38bdf8', '#f97316', '#22c55e', '#a78bfa', '#f43f5e'];
 
 function App() {
   const {
-    socket,
     gameState,
     isConnected,
-    roomCode,
+    socketId,
+    roomId,
     createRoom,
     joinGame,
     selectTile,
@@ -45,7 +45,7 @@ function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [activeTheme] = useState<TableTheme>(DEFAULT_THEME);
 
-  const currentUser = gameState?.players.find((player) => player.id === socket?.id);
+  const currentUser = gameState?.players.find((player) => player.id === socketId);
   const connectedPlayers = useMemo(
     () => (gameState?.players ?? []).filter((player) => player.isConnected),
     [gameState?.players],
@@ -112,7 +112,7 @@ function App() {
 
   const handleCopyCode = async () => {
     try {
-      await navigator.clipboard.writeText(roomCode);
+      await navigator.clipboard.writeText(roomId);
       setIsCopied(true);
       window.setTimeout(() => setIsCopied(false), 1500);
     } catch {
@@ -139,9 +139,9 @@ function App() {
       name: player.name,
       score: player.score,
       color: PLAYER_COLORS[index % PLAYER_COLORS.length],
-      isCurrentPlayer: player.id === socket?.id,
+      isCurrentPlayer: player.id === socketId,
     }));
-  }, [connectedPlayers, socket?.id]);
+  }, [connectedPlayers, socketId]);
 
   const opponents = useMemo<Opponent[]>(() => {
     return standings
@@ -170,7 +170,7 @@ function App() {
           setTempName={setTempName}
           roomName={roomName}
           setRoomName={setRoomName}
-          roomCode={roomCode}
+          roomCode={roomId}
           inputCode={inputCode}
           setInputCode={setInputCode}
           playerCount={playerCount}
@@ -240,7 +240,7 @@ function App() {
                 <div className="ranking-row__identity">
                   <span>Sala</span>
                 </div>
-                <strong>{roomCode}</strong>
+                <strong>{roomId}</strong>
               </article>
 
               <article className="ranking-row">

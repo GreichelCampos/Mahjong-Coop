@@ -52,7 +52,7 @@ function shuffle<T>(array: T[]): T[] {
 
 function buildTile(symbol: string, index: number): Tile {
   return {
-    id: `tile-${index}`,
+    id: index,
     symbol,
     isFlipped: false,
     isMatched: false,
@@ -161,7 +161,7 @@ function removePlayer(state: GameState, id: string): GameState {
 
 function selectTile(
   state: GameState,
-  tileId: string,
+  tileId: number,
   playerId: string,
 ): { newState: GameState; event: string | null } {
   const tile = state.tiles.find(
@@ -235,8 +235,8 @@ function selectTile(
 
 function checkMatch(
   state: GameState,
-  t1Id: string,
-  t2Id: string,
+  t1Id: number,
+  t2Id: number,
   playerId: string,
 ): { newState: GameState; isMatch: boolean } {
   const t1 = state.tiles.find((tile: Tile) => tile.id === t1Id);

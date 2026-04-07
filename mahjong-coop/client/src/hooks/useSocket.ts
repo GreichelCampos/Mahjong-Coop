@@ -3,52 +3,55 @@ import { io, Socket } from "socket.io-client";
 import type { GameState } from "../types";
 
 const SERVER_URL = "http://localhost:3000";
-const DEFAULT_ROOM = "GLOBAL";
+const DEFAULT_ROOM_ID = "GLOBAL";
 
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [roomCode, setRoomCode] = useState(DEFAULT_ROOM);
+  const [roomId, setRoomId] = useState<string>('');
+  const [socketId, setSocketId] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket = io(SERVER_URL);
-    socketRef.current = socket;
+    // Solo crear el socket si no existe
+    if (!socketRef.current) {
+      const socket = io(SERVER_URL);
+      socketRef.current = socket;
 
-    socket.on("connect", () => {
-      console.log("Conectado al server:", socket.id);
-      setIsConnected(true);
-    });
+      socket.on("connect", () => {
+        console.log("Conectado al server:", socket.id);
+        if (socket.id) {
+          setSocketId(socket.id);
+        }
+        setIsConnected(true);
+      });
 
-    socket.on("disconnect", () => {
-      console.log("Desconectado");
-      setIsConnected(false);
-    });
+      socket.on("disconnect", () => {
+        console.log("Desconectado");
+        setIsConnected(false);
+      });
 
-    socket.on("game:state", (state: GameState) => {
-      console.log("Nuevo estado recibido:", state);
-      setGameState(state);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
+      socket.on("game:state", (state: GameState) => {
+        console.log("Nuevo estado recibido:", state);
+        setGameState(state);
+      });
+    }
   }, []);
 
   const createRoom = (): Promise<string> => {
     return new Promise((resolve) => {
       if (!socketRef.current) {
-        resolve(DEFAULT_ROOM);
+        resolve(DEFAULT_ROOM_ID);
         return;
       }
 
       socketRef.current.emit(
         "room:create",
-        (response: { roomCode: string }) => {
-          const nextRoomCode = response.roomCode.toUpperCase();
-          setRoomCode(nextRoomCode);
-          resolve(nextRoomCode);
+        (response: { roomId: string }) => {
+          const nextRoomId = response.roomId.toUpperCase();
+          setRoomId(nextRoomId);
+          resolve(nextRoomId);
         }
       );
     });
@@ -56,40 +59,37 @@ export const useSocket = () => {
 
   const joinGame = (
     name: string,
-    nextRoomCode?: string
-  ): Promise<{ ok: boolean; roomCode: string }> => {
+    nextRoomId?: string
+  ): Promise<{ ok: boolean; roomId: string }> => {
     return new Promise((resolve) => {
       if (!socketRef.current) {
-        resolve({ ok: false, roomCode });
+        resolve({ ok: false, roomId: nextRoomId || roomId || DEFAULT_ROOM_ID });
         return;
       }
 
-      const finalRoomCode = (nextRoomCode || roomCode || DEFAULT_ROOM).toUpperCase();
+      const finalRoomId = (nextRoomId || roomId || DEFAULT_ROOM_ID).toUpperCase();
 
       socketRef.current.emit(
-        "player:join",
-        { name, roomCode: finalRoomCode },
-        (response: { ok: boolean; roomCode: string }) => {
+        "room:join",
+        { roomId: finalRoomId, name },
+        (response: { ok: boolean; error?: string }) => {
           if (response?.ok) {
-            setRoomCode(response.roomCode.toUpperCase());
+            setRoomId(finalRoomId);
           }
 
           resolve({
             ok: response?.ok ?? false,
-            roomCode: response?.roomCode?.toUpperCase() ?? finalRoomCode,
+            roomId: finalRoomId,
           });
         }
       );
     });
   };
 
-  const selectTile = (tileId: string) => {
+  const selectTile = (tileId: number) => {
     if (!socketRef.current) return;
 
-    socketRef.current.emit("tile:select", {
-      tileId,
-      roomCode,
-    });
+    socketRef.current.emit("tile:select", tileId);
   };
 
   const leaveRoom = () => {
@@ -97,14 +97,14 @@ export const useSocket = () => {
 
     socketRef.current.emit("room:leave");
     setGameState(null);
-    setRoomCode(DEFAULT_ROOM);
+    setRoomId('');
   };
 
   return {
-    socket: socketRef.current,
     gameState,
     isConnected,
-    roomCode,
+    socketId,
+    roomId,
     createRoom,
     joinGame,
     selectTile,

@@ -1,5 +1,5 @@
 export interface Tile {
-  id: string;
+  id: number;
 
   // Modelo actual del backend
   symbol: string;

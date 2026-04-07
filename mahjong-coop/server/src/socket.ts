@@ -26,6 +26,21 @@ function broadcastRoomState(io: SocketIOServer, roomId: string): void {
 
   io.to(roomId).emit("game:state", gameState);
   console.log(`[${roomId}] Estado actualizado - ${gameState.players.length} jugadores`);
+
+  if (gameState.isGameOver) {
+    const winner = gameState.players.reduce((max, p) =>
+      p.score > max.score ? p : max,
+    );
+    io.to(roomId).emit("game:over", {
+      winner: { id: winner.id, name: winner.name, score: winner.score },
+      finalScores: gameState.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        score: p.score,
+      })),
+    });
+    console.log(`[${roomId}] ¡JUEGO TERMINADO! Ganador: ${winner.name}`);
+  }
 }
 
 function cleanupEmptyRoom(io: SocketIOServer, roomId: string): void {
@@ -44,13 +59,23 @@ export function setupSocket(io: SocketIOServer): void {
 
     
     socket.on("room:create", (callback?: (data: { roomId: string }) => void) => {
-      const roomId = ensureUniqueRoomId();
+     
+      const oldRoomId = socket.data.roomId as string | undefined;
+      if (oldRoomId && rooms[oldRoomId]) {
+        socket.leave(oldRoomId);
+        rooms[oldRoomId] = removePlayer(rooms[oldRoomId], socket.id);
+        broadcastRoomState(io, oldRoomId);
+        cleanupEmptyRoom(io, oldRoomId);
+      }
 
+      const roomId = ensureUniqueRoomId();
       rooms[roomId] = createGame(15);
 
       socket.join(roomId);
       socket.data.roomId = roomId;
+      socket.data.playerName = `Player_${socket.id.substring(0, 4)}`;
 
+      // Emitir estado inicial a la sala
       io.to(roomId).emit("game:state", rooms[roomId]);
 
       if (typeof callback === "function") {
@@ -61,49 +86,74 @@ export function setupSocket(io: SocketIOServer): void {
     });
 
     
-    socket.on(
-      "room:join",
-      (
-        payload: { roomId: string; name: string },
-        callback?: (data: { ok: boolean; error?: string }) => void,
-      ) => {
-        const { roomId, name } = payload;
+    const handleRoomJoin = (
+      payload: { roomId: string; name: string } | string,
+      callback?: (data: { ok: boolean; error?: string }) => void,
+    ) => {
+    
+      let roomId: string;
+      let name: string;
 
-        if (!rooms[roomId]) {
-          if (typeof callback === "function") {
-            callback({ ok: false, error: "Sala no encontrada" });
-          }
-          console.log(`[${roomId}] Intento de unión fallido: sala no existe`);
-          return;
+      if (typeof payload === "string") {
+       
+        name = payload;
+        roomId = socket.data.roomId as string | undefined || "";
+      } else {
+        roomId = payload.roomId;
+        name = payload.name;
+      }
+
+      if (!rooms[roomId]) {
+        if (typeof callback === "function") {
+          callback({ ok: false, error: "Sala no encontrada" });
         }
+        console.log(`[${roomId}] Intento de unión fallido: sala no existe`);
+        return;
+      }
 
-        socket.join(roomId);
-        socket.data.roomId = roomId;
-        socket.data.playerName = name;
-
-        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
-
-        broadcastRoomState(io, roomId);
-
+      // Validar que el socket no esté ya en la sala (evitar duplicados)
+      const playerExists = rooms[roomId].players.some((p) => p.id === socket.id);
+      if (playerExists) {
+        // Ya está en la sala, solo emitir el estado
         if (typeof callback === "function") {
           callback({ ok: true });
         }
+        console.log(`[${roomId}] ${socket.id} ya estaba en la sala, se reenvía estado`);
+        broadcastRoomState(io, roomId);
+        return;
+      }
+      socket.join(roomId);
+      socket.data.roomId = roomId;
+      socket.data.playerName = name;
 
-        console.log(`[${roomId}] ${name} (${socket.id}) se unió`);
-      },
-    );
+      
+      rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
 
-    
+      
+      broadcastRoomState(io, roomId);
+
+     
+      if (typeof callback === "function") {
+        callback({ ok: true });
+      }
+
+      console.log(`[${roomId}] ${name} (${socket.id}) se unió`);
+    };
+
+    socket.on("room:join", handleRoomJoin);
+    socket.on("player:join", handleRoomJoin);
+
+   
     socket.on(
       "tile:select",
       (
-        payload: { tileId: string },
+        payload: string | number | { tileId: string | number },
         callback?: (data: { ok: boolean; error?: string }) => void,
       ) => {
         const roomId = socket.data.roomId as string | undefined;
-        const { tileId } = payload;
+        const tileIdRaw = typeof payload === "string" || typeof payload === "number" ? payload : payload.tileId;
+        const tileId = typeof tileIdRaw === "string" ? parseInt(tileIdRaw, 10) : tileIdRaw;
 
-        // Validar que está en una sala
         if (!roomId || !rooms[roomId]) {
           if (typeof callback === "function") {
             callback({ ok: false, error: "No estás en una sala válida" });
@@ -111,22 +161,70 @@ export function setupSocket(io: SocketIOServer): void {
           return;
         }
 
+        if (rooms[roomId].isGameOver) {
+          if (typeof callback === "function") {
+            callback({ ok: false, error: "El juego ya terminó" });
+          }
+          return;
+        }
+
+
         const result = selectTile(rooms[roomId], tileId, socket.id);
         rooms[roomId] = result.newState;
 
-        // Emitir SOLO a esa sala usando io.to(roomId)
-        io.to(roomId).emit("game:state", rooms[roomId]);
+        broadcastRoomState(io, roomId);
 
-        // Feedback al cliente
         if (typeof callback === "function") {
           callback({ ok: true });
         }
 
-        console.log(`[${roomId}] Tile ${tileId} seleccionado por ${socket.id}`);
+        if (result.event) {
+          io.to(roomId).emit("tile:event", {
+            event: result.event,
+            tileId,
+            playerId: socket.id,
+          });
+
+          console.log(
+            `[${roomId}] Tile ${tileId} por ${socket.id} -> ${result.event}`,
+          );
+        }
       },
     );
 
    
+    socket.on("game:reset", (callback?: (data: { ok: boolean }) => void) => {
+      const roomId = socket.data.roomId as string | undefined;
+
+      if (!roomId || !rooms[roomId]) {
+        if (typeof callback === "function") {
+          callback({ ok: false });
+        }
+        return;
+      }
+
+      const currentRoomState = rooms[roomId];
+      const newGameState = createGame(15);
+
+      rooms[roomId] = {
+        ...newGameState,
+        players: currentRoomState.players.map((p) => ({
+          ...p,
+          score: 0, 
+          isConnected: p.isConnected,
+        })),
+      };
+
+      broadcastRoomState(io, roomId);
+
+      if (typeof callback === "function") {
+        callback({ ok: true });
+      }
+
+      console.log(`[${roomId}] Juego reiniciado`);
+    });
+
+    
     socket.on("disconnect", () => {
       const roomId = socket.data.roomId as string | undefined;
       const playerName = socket.data.playerName as string | undefined;
@@ -156,6 +254,7 @@ export function setupSocket(io: SocketIOServer): void {
 
         socket.leave(roomId);
         delete socket.data.roomId;
+        delete socket.data.playerName;
       }
 
       console.log(`[${roomId}] ${playerName ?? socket.id} abandonó la sala`);
