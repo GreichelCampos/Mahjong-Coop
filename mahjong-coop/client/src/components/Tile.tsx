@@ -1,42 +1,36 @@
 import React from 'react';
-import type { TileData, Player } from '../types.ts';
+import type { Tile as TileType, Player } from '../types';
 
 interface TileProps {
-  tile: TileData;
+  tile: TileType;
   player?: Player;
 }
 
 const Tile: React.FC<TileProps> = ({ tile, player }) => {
-  const isLocked = tile.status === 'locked';
-  const isMatched = tile.status === 'matched';
-  const isFlipped = tile.status === 'flipped' || isMatched || isLocked;
+  const isLocked = tile.lockedBy !== null && !tile.isMatched;
+  const isMatched = tile.isMatched;
+  const isFlipped = tile.isFlipped || isMatched;
 
   return (
-    <div className={`tile-wrapper ${tile.status}`}>
-      <div 
-        className={`tile-inner ${isFlipped ? 'flipped' : ''}`} 
-        style={{ borderColor: isLocked ? player?.color : '' }}
-      >
+    <div
+      className={`tile-wrapper ${
+        isMatched ? 'matched' : isLocked ? 'locked' : isFlipped ? 'flipped' : 'hidden'
+      }`}
+    >
+      <div className={`tile-inner ${isFlipped ? 'flipped' : ''}`}>
         <div className="tile-front">?</div>
-        
+
         <div className="tile-back">
-          <span className="tile-icon">{tile.content}</span>
-          {isLocked && (
-            <div 
-              className="lock-label" 
-              style={{ backgroundColor: player?.color }}
-            >
-              {player?.name}
+          <span className="tile-icon">{tile.symbol}</span>
+
+          {isLocked && player && (
+            <div className="lock-label">
+              {player.name}
             </div>
           )}
         </div>
 
-        {isLocked && (
-          <div 
-            className="pulse-ring" 
-            style={{ borderColor: player?.color }}
-          ></div>
-        )}
+        {isLocked && <div className="pulse-ring"></div>}
       </div>
     </div>
   );

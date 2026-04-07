@@ -1,20 +1,27 @@
+export interface Tile {
+  id: string;
+  symbol: string;
+  isFlipped: boolean;
+  isMatched: boolean;
+  lockedBy: string | null;
+}
+
 export interface Player {
   id: string;
   name: string;
   score: number;
-  color: string;
+  isConnected: boolean;
 }
 
-export interface TileData {
-  id: number;
-  content: string;
-  status: 'hidden' | 'flipped' | 'matched' | 'locked';
-  lockedBy?: string;
+export interface ScoreSnapshot {
+  timestamp: number;
+  scores: Record<string, number>;
 }
 
 export interface GameState {
+  tiles: Tile[];
   players: Player[];
-  tiles: TileData[];
-  isJoined: boolean;
-  currentUser?: Player;
+  scoreHistory: ScoreSnapshot[];
+  isGameOver: boolean;
+  startTime: number | null;
 }
