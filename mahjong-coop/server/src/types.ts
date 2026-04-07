@@ -1,13 +1,11 @@
 export interface Tile {
   id: number;
 
-  // Modelo actual del backend
   symbol: string;
   isFlipped: boolean;
   isMatched: boolean;
   lockedBy: string | null;
 
-  // Campos puente para acercarlo al modelo del frontend
   x?: number;
   y?: number;
   z?: number;

@@ -4,7 +4,8 @@
   "description": "Backend del juego multijugador con Express + Socket.io",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+    "clean-port": "node kill-port.js 3000",
+    "dev": "npm run clean-port && nodemon --watch src --ext ts --delay 100ms --signal SIGTERM --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
