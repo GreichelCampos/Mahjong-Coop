@@ -307,16 +307,129 @@
   border: 1px solid #baab89;
   color: #3f2e19;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 0.7rem;
-  text-transform: capitalize;
+  overflow: hidden;
 }
 
-.tile__face strong {
+.mahjong-glyph {
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mahjong-glyph--dots {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mahjong-dots-row,
+.mahjong-bamboo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.mahjong-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(63, 46, 25, 0.32);
+  box-shadow: inset 0 0 0 2px rgba(255, 253, 244, 0.85);
+}
+
+.mahjong-dot--red {
+  background: radial-gradient(circle at 35% 35%, #fca5a5, #b91c1c 72%);
+}
+
+.mahjong-dot--green {
+  background: radial-gradient(circle at 35% 35%, #86efac, #15803d 72%);
+}
+
+.mahjong-dot--blue {
+  background: radial-gradient(circle at 35% 35%, #93c5fd, #1d4ed8 72%);
+}
+
+.mahjong-glyph--bamboo {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mahjong-bamboo-stick {
+  width: 8px;
+  height: 26px;
+  display: grid;
+  grid-template-rows: 5px 1fr 5px;
+  gap: 2px;
+}
+
+.mahjong-bamboo-stick__top,
+.mahjong-bamboo-stick__body,
+.mahjong-bamboo-stick__bottom {
+  border-radius: 999px;
+}
+
+.mahjong-bamboo-stick__top,
+.mahjong-bamboo-stick__bottom {
+  background: linear-gradient(180deg, #34d399, #15803d);
+}
+
+.mahjong-bamboo-stick__body {
+  background: linear-gradient(180deg, #f87171, #16a34a);
+}
+
+.mahjong-glyph--chars,
+.mahjong-glyph--honor,
+.mahjong-glyph--special {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mahjong-chinese {
+  font-family: "Noto Serif CJK SC", "Songti SC", "SimSun", "PMingLiU", serif;
+  line-height: 1;
+}
+
+.mahjong-chinese--number {
   font-size: 1rem;
+  color: #166534;
+}
+
+.mahjong-chinese--main {
+  font-size: 1.7rem;
+  color: #b91c1c;
+}
+
+.mahjong-chinese--honor {
+  font-size: 2rem;
+  color: #111827;
+}
+
+.mahjong-chinese--accent {
+  color: #1d4ed8;
+}
+
+.mahjong-chinese--red {
+  color: #b91c1c;
+}
+
+.mahjong-chinese--green {
+  color: #15803d;
+}
+
+.mahjong-chinese--plain {
+  color: #f8fafc;
+  text-shadow:
+    0 0 0 #475569,
+    0 0 1px #475569,
+    0 1px 0 #475569,
+    1px 0 0 #475569,
+    -1px 0 0 #475569;
 }
 
 .sidebar-card,
