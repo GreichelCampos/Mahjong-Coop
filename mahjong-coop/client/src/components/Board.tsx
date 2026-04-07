@@ -4,7 +4,7 @@ import type { TableTheme, Tile as TileType } from '../types';
 
 interface BoardProps {
   tiles: TileType[];
-  onTileClick: (id: number) => void;
+  onTileClick: (id: string) => void;
   isSelectable: (tile: TileType) => boolean;
   theme: TableTheme;
 }

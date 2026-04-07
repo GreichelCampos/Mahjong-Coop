@@ -72,21 +72,11 @@ function renderBambooTile(value: number) {
 }
 
 function renderCharacterTile(value: number) {
-  const numerals = [
-    '\u4E00',
-    '\u4E8C',
-    '\u4E09',
-    '\u56DB',
-    '\u4E94',
-    '\u516D',
-    '\u4E03',
-    '\u516B',
-    '\u4E5D',
-  ];
+  const numerals = ['\u4E00', '\u4E8C', '\u4E09', '\u56DB', '\u4E94', '\u516D', '\u4E03', '\u516B', '\u4E5D'];
 
   return (
     <span className="mahjong-glyph mahjong-glyph--chars" aria-hidden="true">
-      <span className="mahjong-chinese mahjong-chinese--number">{numerals[value]}</span>
+      <span className="mahjong-chinese mahjong-chinese--number">{numerals[value] ?? numerals[0]}</span>
       <span className="mahjong-chinese mahjong-chinese--main">{'\u842C'}</span>
     </span>
   );
@@ -97,7 +87,7 @@ function renderWindTile(value: number) {
 
   return (
     <span className="mahjong-glyph mahjong-glyph--honor" aria-hidden="true">
-      <span className="mahjong-chinese mahjong-chinese--honor">{winds[value]}</span>
+      <span className="mahjong-chinese mahjong-chinese--honor">{winds[value] ?? winds[0]}</span>
     </span>
   );
 }
@@ -134,30 +124,40 @@ function renderFlowerOrSeasonTile(category: string, value: number) {
 }
 
 function renderTileFace(tile: TileType) {
-  switch (tile.category) {
+  const category = tile.category ?? 'memory';
+  const value = tile.value ?? 0;
+  const label = tile.label ?? tile.symbol;
+
+  switch (category) {
     case 'dots':
-      return renderDotsTile(tile.value);
+      return renderDotsTile(value);
     case 'bamboo':
-      return renderBambooTile(tile.value);
+      return renderBambooTile(value);
     case 'chars':
-      return renderCharacterTile(tile.value);
+      return renderCharacterTile(value);
     case 'winds':
-      return renderWindTile(tile.value);
+      return renderWindTile(value);
     case 'dragons':
-      return renderDragonTile(tile.value);
+      return renderDragonTile(value);
     case 'flowers':
     case 'seasons':
-      return renderFlowerOrSeasonTile(tile.category, tile.value);
+      return renderFlowerOrSeasonTile(category, value);
     default:
       return (
         <span className="mahjong-glyph mahjong-glyph--honor" aria-hidden="true">
-          <span className="mahjong-chinese mahjong-chinese--honor">{tile.label}</span>
+          <span className="mahjong-chinese mahjong-chinese--honor">{label}</span>
         </span>
       );
   }
 }
 
 function Tile({ tile, selectable, onClick }: TileProps) {
+  const x = tile.x ?? 0;
+  const y = tile.y ?? 0;
+  const z = tile.z ?? 0;
+  const category = tile.category ?? 'memory';
+  const value = tile.value ?? 0;
+
   return (
     <button
       type="button"
@@ -168,17 +168,14 @@ function Tile({ tile, selectable, onClick }: TileProps) {
       style={{
         width: TILE_WIDTH,
         height: TILE_HEIGHT,
-        left: tile.x * (TILE_WIDTH * 0.92),
-        top: tile.y * (TILE_HEIGHT * 0.82) - tile.z * DEPTH_OFFSET,
-        zIndex: tile.z * 100 + Math.round(tile.y * 10),
+        left: x * (TILE_WIDTH * 0.92),
+        top: y * (TILE_HEIGHT * 0.82) - z * DEPTH_OFFSET,
+        zIndex: z * 100 + Math.round(y * 10),
       }}
     >
       <span className="tile__shadow" />
       <span className="tile__depth" />
-      <span
-        className="tile__face"
-        aria-label={`Ficha ${tile.category} ${tile.value + 1}`}
-      >
+      <span className="tile__face" aria-label={`Ficha ${category} ${value + 1}`}>
         {renderTileFace(tile)}
       </span>
     </button>
