@@ -2,179 +2,163 @@ import { Server as SocketIOServer, Socket } from "socket.io";
 import { createGame, addPlayer, removePlayer, selectTile } from "./game";
 import type { GameState } from "./types";
 
-type JoinPayload =
-  | string
-  | {
-      name: string;
-      roomCode?: string;
-    };
+const rooms: Record<string, GameState> = {};
 
-type SelectTilePayload =
-  | string
-  | {
-      tileId: string;
-      roomCode?: string;
-    };
-
-interface RoomState {
-  code: string;
-  gameState: GameState;
-}
-
-const DEFAULT_ROOM = "global";
-const ROOM_CODE_LENGTH = 6;
-
-const rooms = new Map<string, RoomState>();
-
-function generateRoomCode(): string {
+function generateRoomId(): string {
   return Math.random()
     .toString(36)
-    .slice(2, 2 + ROOM_CODE_LENGTH)
+    .substring(2, 8)
     .toUpperCase();
 }
 
-function getOrCreateRoom(roomCode: string): RoomState {
-  const normalizedCode = roomCode.toUpperCase();
-
-  const existingRoom = rooms.get(normalizedCode);
-  if (existingRoom) {
-    return existingRoom;
+function ensureUniqueRoomId(): string {
+  let roomId = generateRoomId();
+  while (rooms[roomId]) {
+    roomId = generateRoomId();
   }
-
-  const newRoom: RoomState = {
-    code: normalizedCode,
-    gameState: createGame(15),
-  };
-
-  rooms.set(normalizedCode, newRoom);
-  return newRoom;
+  return roomId;
 }
 
-function emitRoomState(io: SocketIOServer, roomCode: string): void {
-  const room = rooms.get(roomCode);
-  if (!room) return;
 
-  io.to(roomCode).emit("game:state", room.gameState);
+function broadcastRoomState(io: SocketIOServer, roomId: string): void {
+  const gameState = rooms[roomId];
+  if (!gameState) return;
+
+  io.to(roomId).emit("game:state", gameState);
+  console.log(`[${roomId}] Estado actualizado - ${gameState.players.length} jugadores`);
 }
 
-function cleanupRoomIfEmpty(io: SocketIOServer, roomCode: string): void {
-  if (roomCode === DEFAULT_ROOM) return;
+function cleanupEmptyRoom(io: SocketIOServer, roomId: string): void {
+  const roomSockets = io.sockets.adapter.rooms.get(roomId);
+  const isEmpty = !roomSockets || roomSockets.size === 0;
 
-  const roomSockets = io.sockets.adapter.rooms.get(roomCode);
-  if (!roomSockets || roomSockets.size === 0) {
-    rooms.delete(roomCode);
-    console.log(`Sala eliminada por quedar vacía: ${roomCode}`);
+  if (isEmpty && rooms[roomId]) {
+    delete rooms[roomId];
+    console.log(`[${roomId}] Sala eliminada (vacía)`);
   }
 }
 
 export function setupSocket(io: SocketIOServer): void {
-  getOrCreateRoom(DEFAULT_ROOM);
-
   io.on("connection", (socket: Socket) => {
-    console.log("Jugador conectado:", socket.id);
+    console.log(`[CONNECT] Socket ${socket.id} conectado`);
 
+    
+    socket.on("room:create", (callback?: (data: { roomId: string }) => void) => {
+      const roomId = ensureUniqueRoomId();
+
+      rooms[roomId] = createGame(15);
+
+      socket.join(roomId);
+      socket.data.roomId = roomId;
+
+      io.to(roomId).emit("game:state", rooms[roomId]);
+
+      if (typeof callback === "function") {
+        callback({ roomId });
+      }
+
+      console.log(`[${roomId}] Sala creada por ${socket.id}`);
+    });
+
+    
     socket.on(
-      "room:create",
-      (callback?: (response: { roomCode: string }) => void) => {
-        let roomCode = generateRoomCode();
-
-        while (rooms.has(roomCode)) {
-          roomCode = generateRoomCode();
-        }
-
-        getOrCreateRoom(roomCode);
-
-        if (typeof callback === "function") {
-          callback({ roomCode });
-        }
-      },
-    );
-
-    socket.on(
-      "player:join",
+      "room:join",
       (
-        payload: JoinPayload,
-        callback?: (response: { ok: boolean; roomCode: string }) => void,
+        payload: { roomId: string; name: string },
+        callback?: (data: { ok: boolean; error?: string }) => void,
       ) => {
-        const name = typeof payload === "string" ? payload : payload.name;
-        const roomCode =
-          typeof payload === "string"
-            ? DEFAULT_ROOM
-            : (payload.roomCode || DEFAULT_ROOM).toUpperCase();
+        const { roomId, name } = payload;
 
-        const room = getOrCreateRoom(roomCode);
+        if (!rooms[roomId]) {
+          if (typeof callback === "function") {
+            callback({ ok: false, error: "Sala no encontrada" });
+          }
+          console.log(`[${roomId}] Intento de unión fallido: sala no existe`);
+          return;
+        }
 
-        socket.join(roomCode);
-        socket.data.roomCode = roomCode;
+        socket.join(roomId);
+        socket.data.roomId = roomId;
         socket.data.playerName = name;
 
-        room.gameState = addPlayer(room.gameState, socket.id, name);
+        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
 
-        emitRoomState(io, roomCode);
+        broadcastRoomState(io, roomId);
 
         if (typeof callback === "function") {
-          callback({ ok: true, roomCode });
+          callback({ ok: true });
         }
 
-        console.log(`Jugador ${name} unido a sala ${roomCode}`);
+        console.log(`[${roomId}] ${name} (${socket.id}) se unió`);
       },
     );
 
-    socket.on("tile:select", (payload: SelectTilePayload) => {
-      const tileId = typeof payload === "string" ? payload : payload.tileId;
-      const roomCode =
-        typeof payload === "string"
-          ? (socket.data.roomCode as string | undefined) || DEFAULT_ROOM
-          : (
-              payload.roomCode ||
-              socket.data.roomCode ||
-              DEFAULT_ROOM
-            ).toUpperCase();
+    
+    socket.on(
+      "tile:select",
+      (
+        payload: { tileId: string },
+        callback?: (data: { ok: boolean; error?: string }) => void,
+      ) => {
+        const roomId = socket.data.roomId as string | undefined;
+        const { tileId } = payload;
 
-      const room = rooms.get(roomCode);
-      if (!room) return;
+        // Validar que está en una sala
+        if (!roomId || !rooms[roomId]) {
+          if (typeof callback === "function") {
+            callback({ ok: false, error: "No estás en una sala válida" });
+          }
+          return;
+        }
 
-      const result = selectTile(room.gameState, tileId, socket.id);
-      room.gameState = result.newState;
+        const result = selectTile(rooms[roomId], tileId, socket.id);
+        rooms[roomId] = result.newState;
 
-      emitRoomState(io, roomCode);
-    });
+        // Emitir SOLO a esa sala usando io.to(roomId)
+        io.to(roomId).emit("game:state", rooms[roomId]);
 
-    socket.on("room:leave", () => {
-      const roomCode =
-        (socket.data.roomCode as string | undefined) || DEFAULT_ROOM;
-      const playerName = socket.data.playerName as string | undefined;
+        // Feedback al cliente
+        if (typeof callback === "function") {
+          callback({ ok: true });
+        }
 
-      const room = rooms.get(roomCode);
-      if (room) {
-        room.gameState = removePlayer(room.gameState, socket.id);
-        emitRoomState(io, roomCode);
-      }
+        console.log(`[${roomId}] Tile ${tileId} seleccionado por ${socket.id}`);
+      },
+    );
 
-      socket.leave(roomCode);
-      cleanupRoomIfEmpty(io, roomCode);
-
-      console.log(
-        `Jugador ${playerName ?? socket.id} salió de sala ${roomCode}`,
-      );
-    });
-
+   
     socket.on("disconnect", () => {
-      const roomCode =
-        (socket.data.roomCode as string | undefined) || DEFAULT_ROOM;
+      const roomId = socket.data.roomId as string | undefined;
       const playerName = socket.data.playerName as string | undefined;
 
-      const room = rooms.get(roomCode);
-      if (room) {
-        room.gameState = removePlayer(room.gameState, socket.id);
-        emitRoomState(io, roomCode);
+      if (roomId && rooms[roomId]) {
+        rooms[roomId] = removePlayer(rooms[roomId], socket.id);
+
+        broadcastRoomState(io, roomId);
+
+        cleanupEmptyRoom(io, roomId);
       }
 
-      cleanupRoomIfEmpty(io, roomCode);
-
       console.log(
-        `Jugador desconectado: ${playerName ?? socket.id} de sala ${roomCode}`,
+        `[DISCONNECT] ${playerName ?? socket.id} desconectado de ${roomId ?? "sin sala"}`,
       );
+    });
+
+    
+    socket.on("room:leave", () => {
+      const roomId = socket.data.roomId as string | undefined;
+      const playerName = socket.data.playerName as string | undefined;
+
+      if (roomId && rooms[roomId]) {
+        rooms[roomId] = removePlayer(rooms[roomId], socket.id);
+        broadcastRoomState(io, roomId);
+        cleanupEmptyRoom(io, roomId);
+
+        socket.leave(roomId);
+        delete socket.data.roomId;
+      }
+
+      console.log(`[${roomId}] ${playerName ?? socket.id} abandonó la sala`);
     });
   });
 }
