@@ -1,39 +1,39 @@
-import React from 'react';
-import type { Tile as TileType, Player } from '../types';
+import type { Tile as TileType } from '../types';
 
 interface TileProps {
   tile: TileType;
-  player?: Player;
+  selectable: boolean;
+  onClick: () => void;
 }
 
-const Tile: React.FC<TileProps> = ({ tile, player }) => {
-  const isLocked = tile.lockedBy !== null && !tile.isMatched;
-  const isMatched = tile.isMatched;
-  const isFlipped = tile.isFlipped || isMatched;
+const TILE_WIDTH = 62;
+const TILE_HEIGHT = 82;
+const DEPTH_OFFSET = 8;
 
+function Tile({ tile, selectable, onClick }: TileProps) {
   return (
-    <div
-      className={`tile-wrapper ${
-        isMatched ? 'matched' : isLocked ? 'locked' : isFlipped ? 'flipped' : 'hidden'
-      }`}
+    <button
+      type="button"
+      className={`tile ${
+        tile.isSelected ? 'tile--selected' : ''
+      } ${tile.isHinted ? 'tile--hinted' : ''} ${!selectable ? 'tile--blocked' : ''}`}
+      onClick={onClick}
+      style={{
+        width: TILE_WIDTH,
+        height: TILE_HEIGHT,
+        left: tile.x * (TILE_WIDTH * 0.92),
+        top: tile.y * (TILE_HEIGHT * 0.82) - tile.z * DEPTH_OFFSET,
+        zIndex: tile.z * 100 + Math.round(tile.y * 10),
+      }}
     >
-      <div className={`tile-inner ${isFlipped ? 'flipped' : ''}`}>
-        <div className="tile-front">?</div>
-
-        <div className="tile-back">
-          <span className="tile-icon">{tile.symbol}</span>
-
-          {isLocked && player && (
-            <div className="lock-label">
-              {player.name}
-            </div>
-          )}
-        </div>
-
-        {isLocked && <div className="pulse-ring"></div>}
-      </div>
-    </div>
+      <span className="tile__shadow" />
+      <span className="tile__depth" />
+      <span className="tile__face">
+        <strong>{tile.label}</strong>
+        <small>{tile.category}</small>
+      </span>
+    </button>
   );
-};
+}
 
 export default Tile;

@@ -1,24 +1,34 @@
-import React from 'react';
+import type { CSSProperties } from 'react';
 import Tile from './Tile';
-import type { Tile as TileType, Player } from '../types';
+import type { TableTheme, Tile as TileType } from '../types';
 
 interface BoardProps {
   tiles: TileType[];
-  players: Player[];
+  onTileClick: (id: number) => void;
+  isSelectable: (tile: TileType) => boolean;
+  theme: TableTheme;
 }
 
-const Board: React.FC<BoardProps> = ({ tiles, players }) => {
+function Board({ tiles, onTileClick, isSelectable, theme }: BoardProps) {
   return (
-    <div className="board-grid">
-      {tiles.map((tile) => (
-        <Tile
-          key={tile.id}
-          tile={tile}
-          player={players.find((p) => p.id === tile.lockedBy)}
-        />
-      ))}
-    </div>
+    <section className="table-shell" style={{ '--table-accent': theme.accent } as CSSProperties}>
+      <div className="table-shell__frame" style={{ background: theme.background }}>
+        <div className="table-shell__glow" />
+        <div className="board-canvas">
+          {tiles.map((tile) =>
+            tile.isMatched ? null : (
+              <Tile
+                key={tile.id}
+                tile={tile}
+                selectable={isSelectable(tile)}
+                onClick={() => onTileClick(tile.id)}
+              />
+            ),
+          )}
+        </div>
+      </div>
+    </section>
   );
-};
+}
 
 export default Board;

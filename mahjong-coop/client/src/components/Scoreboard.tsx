@@ -1,17 +1,30 @@
-import React from 'react';
-import type { Player } from '../types.ts';
+import type { PlayerStanding } from '../types';
 
-const Scoreboard: React.FC<{ players: Player[] }> = ({ players }) => (
-  <div className="scoreboard">
-    <h3>Players</h3>
-    {players.sort((a,b) => b.score - a.score).map(p => (
-      <div key={p.id} className="player-row">
-        <span className="player-color" style={{ backgroundColor: p.color }}></span>
-        <span className="player-name">{p.name}</span>
-        <span className="player-score">{p.score}</span>
+interface ScoreboardProps {
+  players: PlayerStanding[];
+}
+
+function Scoreboard({ players }: ScoreboardProps) {
+  const ranking = [...players].sort((a, b) => b.score - a.score);
+
+  return (
+    <section className="panel sidebar-card">
+      <div className="panel__eyebrow">Ranking</div>
+      <h2>Tabla en vivo</h2>
+      <div className="ranking-list">
+        {ranking.map((player, index) => (
+          <article key={player.name} className={`ranking-row ${player.isCurrentPlayer ? 'ranking-row--me' : ''}`}>
+            <div className="ranking-row__identity">
+              <span className="ranking-row__place">#{index + 1}</span>
+              <span className="ranking-row__dot" style={{ backgroundColor: player.color }} />
+              <span>{player.name}</span>
+            </div>
+            <strong>{player.score}</strong>
+          </article>
+        ))}
       </div>
-    ))}
-  </div>
-);
+    </section>
+  );
+}
 
 export default Scoreboard;

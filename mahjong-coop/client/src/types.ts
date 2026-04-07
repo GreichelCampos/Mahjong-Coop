@@ -1,9 +1,41 @@
-export interface Tile {
+export type ScreenState =
+  | 'welcome'
+  | 'menu'
+  | 'matchmaking'
+  | 'lobby'
+  | 'loading'
+  | 'playing';
+
+export interface TableTheme {
   id: string;
-  symbol: string;
-  isFlipped: boolean;
+  name: string;
+  background: string;
+  accent: string;
+}
+
+export interface TileSymbol {
+  label: string;
+  category: string;
+  value: number;
+}
+
+export interface Tile {
+  id: number;
+  x: number;
+  y: number;
+  z: number;
+  label: string;
+  category: string;
+  value: number;
   isMatched: boolean;
-  lockedBy: string | null;
+  isSelected: boolean;
+  isHinted: boolean;
+}
+
+export interface Opponent {
+  name: string;
+  score: number;
+  color: string;
 }
 
 export interface Player {
@@ -11,11 +43,24 @@ export interface Player {
   name: string;
   score: number;
   isConnected: boolean;
+  color?: string;
+}
+
+export interface ScorePoint {
+  time: number;
+  [key: string]: number;
 }
 
 export interface ScoreSnapshot {
   timestamp: number;
   scores: Record<string, number>;
+}
+
+export interface PlayerStanding {
+  name: string;
+  score: number;
+  color: string;
+  isCurrentPlayer?: boolean;
 }
 
 export interface GameState {
