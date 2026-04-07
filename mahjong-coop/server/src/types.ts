@@ -1,9 +1,21 @@
 export interface Tile {
   id: string;
+
+  // Modelo actual del backend
   symbol: string;
   isFlipped: boolean;
   isMatched: boolean;
   lockedBy: string | null;
+
+  // Campos puente para acercarlo al modelo del frontend
+  x?: number;
+  y?: number;
+  z?: number;
+  label?: string;
+  category?: string;
+  value?: number;
+  isSelected?: boolean;
+  isHinted?: boolean;
 }
 
 export interface Player {
@@ -11,6 +23,7 @@ export interface Player {
   name: string;
   score: number;
   isConnected: boolean;
+  color?: string;
 }
 
 export interface ScoreSnapshot {
