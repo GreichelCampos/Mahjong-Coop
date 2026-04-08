@@ -20,21 +20,19 @@ export interface TileSymbol {
 }
 
 export interface Tile {
-  id: string;
-
-  symbol: string;
-  isFlipped: boolean;
+  id: number;
+  x: number;
+  y: number;
+  z: number;
+  label: string;
+  symbol?: string;
+  category: string;
+  value: number;
+  lockedBy?: string | null;
+  isFlipped?: boolean;
   isMatched: boolean;
-  lockedBy: string | null;
-
-  x?: number;
-  y?: number;
-  z?: number;
-  label?: string;
-  category?: string;
-  value?: number;
-  isSelected?: boolean;
-  isHinted?: boolean;
+  isSelected: boolean;
+  isHinted: boolean;
 }
 
 export interface Opponent {

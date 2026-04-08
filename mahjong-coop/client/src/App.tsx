@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Board from './components/Board';
 import LiveChart from './components/LiveChart';
 import Lobby from './components/Lobby';
+import RulesPanel from './components/RulesPanel';
 import Scoreboard from './components/Scoreboard';
 import { useSocket } from './hooks/useSocket';
 import type {
@@ -15,10 +16,10 @@ import type {
 import './App.css';
 
 const DEFAULT_THEME: TableTheme = {
-  id: 'night',
-  name: 'Night',
-  background: 'radial-gradient(circle at top, #16314f 0%, #08152f 38%, #030b18 100%)',
-  accent: '#f59e0b',
+  id: 'jade-classic',
+  name: 'Jade Classic',
+  background: 'radial-gradient(circle at 50% 30%, #2d7a4f 0%, #1d5c3b 42%, #103923 100%)',
+  accent: '#86efac',
 };
 
 const PLAYER_COLORS = ['#38bdf8', '#f97316', '#22c55e', '#a78bfa', '#f43f5e'];
@@ -44,6 +45,7 @@ function App() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
   const [activeTheme] = useState<TableTheme>(DEFAULT_THEME);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const currentUser = gameState?.players.find((player) => player.id === socketId);
   const connectedPlayers = useMemo(
@@ -120,20 +122,6 @@ function App() {
     }
   };
 
-  const chartData = useMemo<ScorePoint[]>(() => {
-    if (!gameState) return [];
-
-    return gameState.scoreHistory.map((snapshot, index) => {
-      const point: ScorePoint = { time: index + 1 };
-
-      gameState.players.forEach((player) => {
-        point[player.name] = snapshot.scores[player.id] ?? 0;
-      });
-
-      return point;
-    });
-  }, [gameState]);
-
   const standings = useMemo<PlayerStanding[]>(() => {
     return connectedPlayers.map((player, index) => ({
       name: player.name,
@@ -143,15 +131,63 @@ function App() {
     }));
   }, [connectedPlayers, socketId]);
 
-  const opponents = useMemo<Opponent[]>(() => {
-    return standings
-      .filter((player) => !player.isCurrentPlayer)
-      .map((player) => ({
-        name: player.name,
-        score: player.score,
-        color: player.color,
-      }));
-  }, [standings]);
+  const chartPlayers = useMemo<Opponent[]>(
+    () =>
+      connectedPlayers
+        .filter((player) => player.id !== socketId)
+        .map((player, index) => ({
+          name: player.name,
+          score: player.score,
+          color: PLAYER_COLORS[(index + 1) % PLAYER_COLORS.length],
+        })),
+    [connectedPlayers, socketId],
+  );
+
+  const scoreChartData = useMemo<ScorePoint[]>(() => {
+    if (!gameState?.scoreHistory?.length) {
+      return connectedPlayers.length
+        ? [
+            connectedPlayers.reduce<ScorePoint>(
+              (accumulator, player) => ({
+                ...accumulator,
+                [player.name]: player.score,
+              }),
+              { time: 0 },
+            ),
+          ]
+        : [];
+    }
+
+    const startTime = gameState.startTime ?? gameState.scoreHistory[0]?.timestamp ?? Date.now();
+
+    return gameState.scoreHistory.map((snapshot) => {
+      const playerScores = connectedPlayers.reduce<Record<string, number>>((accumulator, player) => {
+        accumulator[player.name] = snapshot.scores[player.id] ?? player.score;
+        return accumulator;
+      }, {});
+
+      return {
+        time: Math.max(0, Math.round((snapshot.timestamp - startTime) / 1000)),
+        ...playerScores,
+      };
+    });
+  }, [connectedPlayers, gameState?.scoreHistory, gameState?.startTime]);
+
+  useEffect(() => {
+    if (screen !== 'playing' || !gameState?.startTime) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const syncElapsed = () => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - gameState.startTime!) / 1000)));
+    };
+
+    syncElapsed();
+    const interval = window.setInterval(syncElapsed, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [gameState?.startTime, screen]);
 
   const isSelectable = (tile: Tile) => {
     if (tile.isMatched) return false;
@@ -200,21 +236,53 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
+    <main className="app-shell app-shell--game">
+      <header className="game-hud panel">
+        <div className="game-hud__title">
           <div className="panel__eyebrow">Partida activa</div>
-          <h1>Mahjong Coop React</h1>
+          <h1>Mahjong Coop</h1>
         </div>
 
-        <div className="topbar__status">
-          <span>{currentUser?.name ?? playerName}</span>
-          <strong>{!isConnected ? 'Reconectando' : gameState?.isGameOver ? 'Finalizada' : 'Jugando'}</strong>
+        <div className="game-hud__chips">
+          <div className="game-chip">
+            <span>Jugador</span>
+            <strong>{currentUser?.name ?? playerName}</strong>
+          </div>
+          <div className="game-chip">
+            <span>Sala</span>
+            <strong>{roomId || '------'}</strong>
+          </div>
+          <div className="game-chip">
+            <span>Estado</span>
+            <strong>{!isConnected ? 'Reconectando' : gameState?.isGameOver ? 'Finalizada' : 'Jugando'}</strong>
+          </div>
+          <div className="game-chip">
+            <span>Tiempo</span>
+            <strong>{new Date(elapsedSeconds * 1000).toISOString().slice(14, 19)}</strong>
+          </div>
         </div>
       </header>
 
-      <section className="dashboard-grid">
-        <div className="dashboard-grid__main">
+      <section className="game-table">
+        <div className="game-table__board">
+          <section className="panel controls-card">
+            <div className="panel__eyebrow">Controles</div>
+            <div className="controls-row">
+              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
+                Nuevo
+              </button>
+              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
+                Deshacer
+              </button>
+              <button className="control-button control-button--accent" type="button" disabled title="La lógica de pista no está expuesta en el frontend conectado actual">
+                Pista
+              </button>
+              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
+                Mezclar
+              </button>
+            </div>
+          </section>
+
           <Board
             tiles={gameState?.tiles ?? []}
             onTileClick={selectTile}
@@ -223,33 +291,26 @@ function App() {
           />
 
           <LiveChart
-            data={chartData}
+            data={scoreChartData}
             currentPlayerName={currentUser?.name ?? playerName}
-            opponents={opponents}
+            opponents={chartPlayers}
           />
+
+          <RulesPanel />
         </div>
 
-        <aside className="dashboard-grid__sidebar">
+        <aside className="game-table__sidebar">
           <Scoreboard players={standings} />
-
           <section className="panel sidebar-card">
             <div className="panel__eyebrow">Sesion</div>
-            <h2>Estado actual</h2>
+            <h2>Mesa</h2>
             <div className="ranking-list">
-              <article className="ranking-row">
-                <div className="ranking-row__identity">
-                  <span>Sala</span>
-                </div>
-                <strong>{roomId}</strong>
-              </article>
-
               <article className="ranking-row">
                 <div className="ranking-row__identity">
                   <span>Jugadores</span>
                 </div>
                 <strong>{currentPlayers}</strong>
               </article>
-
               <article className="ranking-row">
                 <div className="ranking-row__identity">
                   <span>Conexion</span>

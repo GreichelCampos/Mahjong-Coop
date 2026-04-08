@@ -6,9 +6,9 @@ interface TileProps {
   onClick: () => void;
 }
 
-const TILE_WIDTH = 62;
-const TILE_HEIGHT = 82;
-const DEPTH_OFFSET = 8;
+const TILE_WIDTH = 82;
+const TILE_HEIGHT = 112;
+const DEPTH_OFFSET = 11;
 
 function renderDotsTile(value: number) {
   const dotPatterns: Record<number, number[]> = {
@@ -161,7 +161,7 @@ function Tile({ tile, selectable, onClick }: TileProps) {
   return (
     <button
       type="button"
-      className={`tile ${
+      className={`tile tile--${category} ${
         tile.isSelected ? 'tile--selected' : ''
       } ${tile.isHinted ? 'tile--hinted' : ''} ${!selectable ? 'tile--blocked' : ''}`}
       onClick={onClick}

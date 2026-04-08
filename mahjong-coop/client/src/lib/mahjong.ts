@@ -112,7 +112,7 @@ export function createTiles() {
   const symbols = shuffle(SYMBOLS);
 
   return positions.map((position, index): Tile => ({
-    id: String(index),
+    id: index,
     symbol: `${symbols[index].label}`,
     isFlipped: false,
     lockedBy: null,
@@ -179,7 +179,7 @@ export function areMatching(firstTile: Tile, secondTile: Tile) {
 export function getAvailablePairsCount(tiles: Tile[]) {
   const selectableTiles = tiles.filter((tile) => isSelectable(tile, tiles));
   let pairs = 0;
-  const seenIds = new Set<string>();
+  const seenIds = new Set<number>();
 
   for (let firstIndex = 0; firstIndex < selectableTiles.length; firstIndex += 1) {
     const firstTile = selectableTiles[firstIndex];

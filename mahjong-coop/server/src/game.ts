@@ -1,40 +1,67 @@
 import type { Tile, Player, GameState, ScoreSnapshot } from "./types";
 
-const MAHJONG_SYMBOLS: string[] = [
-  "🎋1",
-  "🎋2",
-  "🎋3",
-  "🎋4",
-  "🎋5",
-  "🎋6",
-  "🎋7",
-  "🎋8",
-  "🎋9",
-  "🀇",
-  "🀈",
-  "🀉",
-  "🀊",
-  "🀋",
-  "🀌",
-  "🀍",
-  "🀎",
-  "🀏",
-  "🀙",
-  "🀚",
-  "🀛",
-  "🀜",
-  "🀝",
-  "🀞",
-  "🀟",
-  "🀠",
-  "🀡",
-  "🀀",
-  "🀁",
-  "🀂",
-  "🀃",
-  "🀄",
-  "🀅",
-  "🀆",
+type TileSeed = {
+  symbol: string;
+  label: string;
+  category: string;
+  value: number;
+};
+
+type Position = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+const SUIT_SYMBOLS = {
+  dots: ["🀙", "🀚", "🀛", "🀜", "🀝", "🀞", "🀟", "🀠", "🀡"],
+  bamboo: ["🀐", "🀑", "🀒", "🀓", "🀔", "🀕", "🀖", "🀗", "🀘"],
+  chars: ["🀇", "🀈", "🀉", "🀊", "🀋", "🀌", "🀍", "🀎", "🀏"],
+  winds: ["🀀", "🀁", "🀂", "🀃"],
+  dragons: ["🀄", "🀅", "🀆"],
+  seasons: ["春", "夏", "秋", "冬"],
+  flowers: ["梅", "蘭", "菊", "竹"],
+} as const;
+
+const MAHJONG_TILE_SEEDS: TileSeed[] = [
+  ...(["dots", "bamboo", "chars"] as const).flatMap((category) =>
+    SUIT_SYMBOLS[category].flatMap((symbol, value) =>
+      Array.from({ length: 4 }, () => ({
+        symbol,
+        label: symbol,
+        category,
+        value,
+      })),
+    ),
+  ),
+  ...SUIT_SYMBOLS.winds.flatMap((symbol, value) =>
+    Array.from({ length: 4 }, () => ({
+      symbol,
+      label: symbol,
+      category: "winds",
+      value,
+    })),
+  ),
+  ...SUIT_SYMBOLS.dragons.flatMap((symbol, value) =>
+    Array.from({ length: 4 }, () => ({
+      symbol,
+      label: symbol,
+      category: "dragons",
+      value,
+    })),
+  ),
+  ...SUIT_SYMBOLS.seasons.map((symbol, value) => ({
+    symbol,
+    label: symbol,
+    category: "seasons",
+    value,
+  })),
+  ...SUIT_SYMBOLS.flowers.map((symbol, value) => ({
+    symbol,
+    label: symbol,
+    category: "flowers",
+    value,
+  })),
 ];
 
 function shuffle<T>(array: T[]): T[] {
@@ -50,27 +77,74 @@ function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
-function buildTile(symbol: string, index: number): Tile {
+function getClassicTurtlePositions(): Position[] {
+  const positions: Position[] = [];
+
+  for (let y = 1; y <= 6; y += 1) {
+    for (let x = 2; x <= 13; x += 1) {
+      positions.push({ x, y, z: 0 });
+    }
+  }
+
+  for (let x = 4; x <= 9; x += 1) {
+    positions.push({ x, y: 0, z: 0 });
+    positions.push({ x, y: 7, z: 0 });
+  }
+
+  positions.push({ x: 1, y: 3.5, z: 0 });
+  positions.push({ x: 14, y: 3.5, z: 0 });
+  positions.push({ x: 15, y: 3.5, z: 0 });
+
+  for (let y = 1; y <= 6; y += 1) {
+    for (let x = 4; x <= 9; x += 1) {
+      positions.push({ x: x + 0.5, y: y + 0.5, z: 1 });
+    }
+  }
+
+  for (let y = 2; y <= 5; y += 1) {
+    for (let x = 5; x <= 8; x += 1) {
+      positions.push({ x: x + 1, y: y + 1, z: 2 });
+    }
+  }
+
+  for (let y = 3; y <= 4; y += 1) {
+    for (let x = 6; x <= 7; x += 1) {
+      positions.push({ x: x + 1.5, y: y + 1.5, z: 3 });
+    }
+  }
+
+  positions.push({ x: 8, y: 4.5, z: 4 });
+
+  return positions.slice(0, 144);
+}
+
+function buildTile(seed: TileSeed, index: number, position: Position): Tile {
   return {
     id: index,
-    symbol,
+    symbol: seed.symbol,
+    label: seed.label,
+    category: seed.category,
+    value: seed.value,
     isFlipped: false,
     isMatched: false,
     lockedBy: null,
-
-    // Campos puente para frontend
-    label: symbol,
-    category: "memory",
-    value: index,
-    x: index % 6,
-    y: Math.floor(index / 6),
-    z: 0,
+    x: position.x,
+    y: position.y,
+    z: position.z,
     isSelected: false,
     isHinted: false,
   };
 }
 
 function getTileMatchValue(tile: Tile): string {
+  if (tile.category === "seasons") {
+    return "seasons";
+  }
+
+  if (tile.category === "flowers") {
+    return "flowers";
+  }
+
   return tile.label ?? tile.symbol;
 }
 
@@ -96,12 +170,12 @@ function addScoreSnapshot(state: GameState): GameState {
   };
 }
 
-function createGame(pairCount: number): GameState {
-  const symbols = MAHJONG_SYMBOLS.slice(0, pairCount);
-  const shuffledSymbols = shuffle([...symbols, ...symbols]);
+function createGame(_pairCount: number): GameState {
+  const shuffledSeeds = shuffle(MAHJONG_TILE_SEEDS);
+  const positions = getClassicTurtlePositions();
 
-  const tiles: Tile[] = shuffledSymbols.map((symbol: string, index: number) =>
-    buildTile(symbol, index),
+  const tiles: Tile[] = positions.map((position, index) =>
+    buildTile(shuffledSeeds[index]!, index, position),
   );
 
   return {
