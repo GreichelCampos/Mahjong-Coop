@@ -39,37 +39,26 @@ const io = new SocketIOServer(httpServer, {
 
 setupSocket(io);
 
-// Crear servidor con opciones para reutilizar puerto en caso de cierre inesperado
-const server = httpServer.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+const server = httpServer.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
   console.log(`CORS enabled for: ${CLIENT_URL}`);
 });
 
-server.on('listening', () => {
-  const socket = (server as any)._server;
-  if (socket) {
-    socket.setsockopt?.(1, 15, 1); 
-  }
-});
-
 const gracefulShutdown = () => {
-  console.log('\n[SHUTDOWN] Cerrando servidor...');
-  
+  console.log("\n[SHUTDOWN] Cerrando servidor...");
 
   io.disconnectSockets();
-  
 
   server.close(() => {
-    console.log('[SHUTDOWN] Servidor cerrado.');
+    console.log("[SHUTDOWN] Servidor cerrado.");
     process.exit(0);
   });
 
-
   setTimeout(() => {
-    console.error('[SHUTDOWN] Forzando salida...');
+    console.error("[SHUTDOWN] Forzando salida...");
     process.exit(1);
   }, 5000);
 };
 
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", gracefulShutdown);
