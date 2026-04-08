@@ -7,6 +7,8 @@ const DEFAULT_ROOM_ID = "GLOBAL";
 
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
+  const roomIdRef = useRef("");
+  const playerNameRef = useRef("");
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -24,6 +26,20 @@ export const useSocket = () => {
           setSocketId(socket.id);
         }
         setIsConnected(true);
+
+        if (roomIdRef.current && playerNameRef.current) {
+          socket.emit(
+            "room:join",
+            { roomId: roomIdRef.current, name: playerNameRef.current },
+            (response: { ok: boolean; error?: string }) => {
+              if (!response?.ok) {
+                setGameState(null);
+                setRoomId("");
+                roomIdRef.current = "";
+              }
+            },
+          );
+        }
       });
 
       socket.on("disconnect", () => {
@@ -51,6 +67,7 @@ export const useSocket = () => {
         (response: { roomId: string }) => {
           const nextRoomId = response.roomId.toUpperCase();
           setRoomId(nextRoomId);
+          roomIdRef.current = nextRoomId;
           resolve(nextRoomId);
         }
       );
@@ -75,6 +92,12 @@ export const useSocket = () => {
         (response: { ok: boolean; error?: string }) => {
           if (response?.ok) {
             setRoomId(finalRoomId);
+            roomIdRef.current = finalRoomId;
+            playerNameRef.current = name;
+          } else if (roomIdRef.current === finalRoomId) {
+            setRoomId("");
+            setGameState(null);
+            roomIdRef.current = "";
           }
 
           resolve({
@@ -150,6 +173,8 @@ export const useSocket = () => {
     socketRef.current.emit("room:leave");
     setGameState(null);
     setRoomId('');
+    roomIdRef.current = "";
+    playerNameRef.current = "";
   };
 
   return {

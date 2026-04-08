@@ -222,6 +222,7 @@ function App() {
 
   const currentScore = currentUser?.score ?? 0;
   const gameStatus = !isConnected ? 'Reconectando' : gameState?.isGameOver ? 'Finalizada' : 'Jugando';
+  const hasActiveRoom = Boolean(roomId && gameState);
 
   const boardTiles = useMemo(
     () =>
@@ -481,7 +482,7 @@ function App() {
                     className="control-button"
                     type="button"
                     onClick={handleResetGame}
-                    disabled={!isConnected}
+                    disabled={!isConnected || !hasActiveRoom}
                   >
                     Nuevo
                   </button>
@@ -489,7 +490,7 @@ function App() {
                     className="control-button"
                     type="button"
                     onClick={handleUndoMove}
-                    disabled={!isConnected}
+                    disabled={!isConnected || !hasActiveRoom}
                   >
                     Deshacer
                   </button>
@@ -497,7 +498,7 @@ function App() {
                     className="control-button control-button--accent"
                     type="button"
                     onClick={handleHint}
-                    disabled={!availablePairs}
+                    disabled={!hasActiveRoom || !availablePairs}
                   >
                     Pista
                   </button>
@@ -505,7 +506,7 @@ function App() {
                     className="control-button"
                     type="button"
                     onClick={handleShuffleGame}
-                    disabled={!isConnected || Boolean(gameState?.isGameOver)}
+                    disabled={!isConnected || !hasActiveRoom || Boolean(gameState?.isGameOver)}
                   >
                     Mezclar
                   </button>
