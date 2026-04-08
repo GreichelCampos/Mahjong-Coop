@@ -163,7 +163,7 @@ function Tile({ tile, selectable, onClick }: TileProps) {
       type="button"
       className={`tile tile--${category} ${
         tile.isSelected ? 'tile--selected' : ''
-      } ${tile.isHinted ? 'tile--hinted' : ''} ${!selectable ? 'tile--blocked' : ''}`}
+      } ${tile.isHinted ? 'tile--hinted' : ''} ${selectable ? 'tile--available' : 'tile--blocked'}`}
       onClick={onClick}
       style={{
         width: TILE_WIDTH,

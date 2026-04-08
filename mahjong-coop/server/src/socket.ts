@@ -1,8 +1,18 @@
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { createGame, addPlayer, removePlayer, selectTile } from "./game";
+import {
+  addPlayer,
+  cloneGameState,
+  createGame,
+  removePlayer,
+  resetGame,
+  reshuffleTiles,
+  selectTile,
+} from "./game";
 import type { GameState } from "./types";
 
 const rooms: Record<string, GameState> = {};
+const roomHistory: Record<string, GameState[]> = {};
+const HISTORY_LIMIT = 20;
 
 function generateRoomId(): string {
   return Math.random()
@@ -19,7 +29,6 @@ function ensureUniqueRoomId(): string {
   return roomId;
 }
 
-
 function broadcastRoomState(io: SocketIOServer, roomId: string): void {
   const gameState = rooms[roomId];
   if (!gameState) return;
@@ -28,18 +37,20 @@ function broadcastRoomState(io: SocketIOServer, roomId: string): void {
   console.log(`[${roomId}] Estado actualizado - ${gameState.players.length} jugadores`);
 
   if (gameState.isGameOver) {
-    const winner = gameState.players.reduce((max, p) =>
-      p.score > max.score ? p : max,
+    const winner = gameState.players.reduce((max, player) =>
+      player.score > max.score ? player : max,
     );
+
     io.to(roomId).emit("game:over", {
       winner: { id: winner.id, name: winner.name, score: winner.score },
-      finalScores: gameState.players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        score: p.score,
+      finalScores: gameState.players.map((player) => ({
+        id: player.id,
+        name: player.name,
+        score: player.score,
       })),
     });
-    console.log(`[${roomId}] ¡JUEGO TERMINADO! Ganador: ${winner.name}`);
+
+    console.log(`[${roomId}] Juego terminado. Ganador: ${winner.name}`);
   }
 }
 
@@ -49,18 +60,32 @@ function cleanupEmptyRoom(io: SocketIOServer, roomId: string): void {
 
   if (isEmpty && rooms[roomId]) {
     delete rooms[roomId];
-    console.log(`[${roomId}] Sala eliminada (vacía)`);
+    delete roomHistory[roomId];
+    console.log(`[${roomId}] Sala eliminada (vacia)`);
   }
+}
+
+function pushRoomHistory(roomId: string): void {
+  const roomState = rooms[roomId];
+  if (!roomState) return;
+
+  const snapshots = roomHistory[roomId] ?? [];
+  snapshots.push(cloneGameState(roomState));
+
+  if (snapshots.length > HISTORY_LIMIT) {
+    snapshots.shift();
+  }
+
+  roomHistory[roomId] = snapshots;
 }
 
 export function setupSocket(io: SocketIOServer): void {
   io.on("connection", (socket: Socket) => {
     console.log(`[CONNECT] Socket ${socket.id} conectado`);
 
-    
     socket.on("room:create", (callback?: (data: { roomId: string }) => void) => {
-     
       const oldRoomId = socket.data.roomId as string | undefined;
+
       if (oldRoomId && rooms[oldRoomId]) {
         socket.leave(oldRoomId);
         rooms[oldRoomId] = removePlayer(rooms[oldRoomId], socket.id);
@@ -70,80 +95,60 @@ export function setupSocket(io: SocketIOServer): void {
 
       const roomId = ensureUniqueRoomId();
       rooms[roomId] = createGame(15);
+      roomHistory[roomId] = [];
 
       socket.join(roomId);
       socket.data.roomId = roomId;
       socket.data.playerName = `Player_${socket.id.substring(0, 4)}`;
 
-      // Emitir estado inicial a la sala
       io.to(roomId).emit("game:state", rooms[roomId]);
-
-      if (typeof callback === "function") {
-        callback({ roomId });
-      }
+      callback?.({ roomId });
 
       console.log(`[${roomId}] Sala creada por ${socket.id}`);
     });
 
-    
     const handleRoomJoin = (
       payload: { roomId: string; name: string } | string,
       callback?: (data: { ok: boolean; error?: string }) => void,
     ) => {
-    
       let roomId: string;
       let name: string;
 
       if (typeof payload === "string") {
-       
         name = payload;
-        roomId = socket.data.roomId as string | undefined || "";
+        roomId = (socket.data.roomId as string | undefined) || "";
       } else {
         roomId = payload.roomId;
         name = payload.name;
       }
 
       if (!rooms[roomId]) {
-        if (typeof callback === "function") {
-          callback({ ok: false, error: "Sala no encontrada" });
-        }
-        console.log(`[${roomId}] Intento de unión fallido: sala no existe`);
+        callback?.({ ok: false, error: "Sala no encontrada" });
+        console.log(`[${roomId}] Intento de union fallido: sala no existe`);
         return;
       }
 
-      // Validar que el socket no esté ya en la sala (evitar duplicados)
-      const playerExists = rooms[roomId].players.some((p) => p.id === socket.id);
+      const playerExists = rooms[roomId].players.some((player) => player.id === socket.id);
       if (playerExists) {
-        // Ya está en la sala, solo emitir el estado
-        if (typeof callback === "function") {
-          callback({ ok: true });
-        }
-        console.log(`[${roomId}] ${socket.id} ya estaba en la sala, se reenvía estado`);
+        callback?.({ ok: true });
         broadcastRoomState(io, roomId);
         return;
       }
+
       socket.join(roomId);
       socket.data.roomId = roomId;
       socket.data.playerName = name;
 
-      
       rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
-
-      
       broadcastRoomState(io, roomId);
+      callback?.({ ok: true });
 
-     
-      if (typeof callback === "function") {
-        callback({ ok: true });
-      }
-
-      console.log(`[${roomId}] ${name} (${socket.id}) se unió`);
+      console.log(`[${roomId}] ${name} (${socket.id}) se unio`);
     };
 
     socket.on("room:join", handleRoomJoin);
     socket.on("player:join", handleRoomJoin);
 
-   
     socket.on(
       "tile:select",
       (
@@ -151,32 +156,29 @@ export function setupSocket(io: SocketIOServer): void {
         callback?: (data: { ok: boolean; error?: string }) => void,
       ) => {
         const roomId = socket.data.roomId as string | undefined;
-        const tileIdRaw = typeof payload === "string" || typeof payload === "number" ? payload : payload.tileId;
+        const tileIdRaw =
+          typeof payload === "string" || typeof payload === "number" ? payload : payload.tileId;
         const tileId = typeof tileIdRaw === "string" ? parseInt(tileIdRaw, 10) : tileIdRaw;
 
         if (!roomId || !rooms[roomId]) {
-          if (typeof callback === "function") {
-            callback({ ok: false, error: "No estás en una sala válida" });
-          }
+          callback?.({ ok: false, error: "No estas en una sala valida" });
           return;
         }
 
         if (rooms[roomId].isGameOver) {
-          if (typeof callback === "function") {
-            callback({ ok: false, error: "El juego ya terminó" });
-          }
+          callback?.({ ok: false, error: "El juego ya termino" });
           return;
         }
 
-
         const result = selectTile(rooms[roomId], tileId, socket.id);
-        rooms[roomId] = result.newState;
 
-        broadcastRoomState(io, roomId);
-
-        if (typeof callback === "function") {
-          callback({ ok: true });
+        if (result.newState !== rooms[roomId]) {
+          pushRoomHistory(roomId);
+          rooms[roomId] = result.newState;
+          broadcastRoomState(io, roomId);
         }
+
+        callback?.({ ok: true });
 
         if (result.event) {
           io.to(roomId).emit("tile:event", {
@@ -184,56 +186,83 @@ export function setupSocket(io: SocketIOServer): void {
             tileId,
             playerId: socket.id,
           });
-
-          console.log(
-            `[${roomId}] Tile ${tileId} por ${socket.id} -> ${result.event}`,
-          );
         }
       },
     );
 
-   
-    socket.on("game:reset", (callback?: (data: { ok: boolean }) => void) => {
+    socket.on("game:reset", (callback?: (data: { ok: boolean; error?: string }) => void) => {
       const roomId = socket.data.roomId as string | undefined;
 
       if (!roomId || !rooms[roomId]) {
-        if (typeof callback === "function") {
-          callback({ ok: false });
-        }
+        callback?.({ ok: false, error: "No estas en una sala valida" });
         return;
       }
 
-      const currentRoomState = rooms[roomId];
-      const newGameState = createGame(15);
+      roomHistory[roomId] = [];
+      rooms[roomId] = resetGame(rooms[roomId]);
+      broadcastRoomState(io, roomId);
+      callback?.({ ok: true });
+    });
+
+    socket.on("game:shuffle", (callback?: (data: { ok: boolean; error?: string }) => void) => {
+      const roomId = socket.data.roomId as string | undefined;
+
+      if (!roomId || !rooms[roomId]) {
+        callback?.({ ok: false, error: "No estas en una sala valida" });
+        return;
+      }
+
+      if (rooms[roomId].isGameOver) {
+        callback?.({ ok: false, error: "El juego ya termino" });
+        return;
+      }
+
+      pushRoomHistory(roomId);
+      rooms[roomId] = reshuffleTiles(rooms[roomId]);
+      broadcastRoomState(io, roomId);
+      callback?.({ ok: true });
+    });
+
+    socket.on("game:undo", (callback?: (data: { ok: boolean; error?: string }) => void) => {
+      const roomId = socket.data.roomId as string | undefined;
+
+      if (!roomId || !rooms[roomId]) {
+        callback?.({ ok: false, error: "No estas en una sala valida" });
+        return;
+      }
+
+      const snapshots = roomHistory[roomId] ?? [];
+      const previousState = snapshots.pop();
+
+      if (!previousState) {
+        callback?.({ ok: false, error: "No hay movimientos para deshacer" });
+        return;
+      }
+
+      const currentConnections = new Map(
+        rooms[roomId].players.map((player) => [player.id, player.isConnected]),
+      );
 
       rooms[roomId] = {
-        ...newGameState,
-        players: currentRoomState.players.map((p) => ({
-          ...p,
-          score: 0, 
-          isConnected: p.isConnected,
+        ...cloneGameState(previousState),
+        players: previousState.players.map((player) => ({
+          ...player,
+          isConnected: currentConnections.get(player.id) ?? player.isConnected,
         })),
       };
 
+      roomHistory[roomId] = snapshots;
       broadcastRoomState(io, roomId);
-
-      if (typeof callback === "function") {
-        callback({ ok: true });
-      }
-
-      console.log(`[${roomId}] Juego reiniciado`);
+      callback?.({ ok: true });
     });
 
-    
     socket.on("disconnect", () => {
       const roomId = socket.data.roomId as string | undefined;
       const playerName = socket.data.playerName as string | undefined;
 
       if (roomId && rooms[roomId]) {
         rooms[roomId] = removePlayer(rooms[roomId], socket.id);
-
         broadcastRoomState(io, roomId);
-
         cleanupEmptyRoom(io, roomId);
       }
 
@@ -242,7 +271,6 @@ export function setupSocket(io: SocketIOServer): void {
       );
     });
 
-    
     socket.on("room:leave", () => {
       const roomId = socket.data.roomId as string | undefined;
       const playerName = socket.data.playerName as string | undefined;
@@ -257,7 +285,7 @@ export function setupSocket(io: SocketIOServer): void {
         delete socket.data.playerName;
       }
 
-      console.log(`[${roomId}] ${playerName ?? socket.id} abandonó la sala`);
+      console.log(`[${roomId}] ${playerName ?? socket.id} abandono la sala`);
     });
   });
 }

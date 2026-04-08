@@ -5,6 +5,7 @@ import Lobby from './components/Lobby';
 import RulesPanel from './components/RulesPanel';
 import Scoreboard from './components/Scoreboard';
 import { useSocket } from './hooks/useSocket';
+import { isSelectable as isMahjongSelectable } from './lib/mahjong';
 import type {
   Opponent,
   PlayerStanding,
@@ -33,6 +34,9 @@ function App() {
     createRoom,
     joinGame,
     selectTile,
+    resetGame,
+    shuffleGame,
+    undoMove,
     leaveRoom,
   } = useSocket();
 
@@ -46,6 +50,8 @@ function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [activeTheme] = useState<TableTheme>(DEFAULT_THEME);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [hintedTileIds, setHintedTileIds] = useState<number[]>([]);
+  const [controlMessage, setControlMessage] = useState('');
 
   const currentUser = gameState?.players.find((player) => player.id === socketId);
   const connectedPlayers = useMemo(
@@ -143,6 +149,66 @@ function App() {
     [connectedPlayers, socketId],
   );
 
+  const isSelectable = (tile: Tile) => {
+    if (tile.isMatched) return false;
+    if (!currentUser) return false;
+
+    const hasLockAccess = tile.lockedBy === null || tile.lockedBy === currentUser.id;
+
+    if (!hasLockAccess) {
+      return false;
+    }
+
+    return isMahjongSelectable(tile, gameState?.tiles ?? []);
+  };
+
+  const availablePairs = useMemo(() => {
+    const activeTiles = (gameState?.tiles ?? []).filter(
+      (tile) => !tile.isMatched && isSelectable(tile),
+    );
+    let pairs = 0;
+    const used = new Set<number>();
+
+    const canMatch = (left: Tile, right: Tile) => {
+      if (left.category === 'seasons' && right.category === 'seasons') return true;
+      if (left.category === 'flowers' && right.category === 'flowers') return true;
+      return left.label === right.label;
+    };
+
+    for (let index = 0; index < activeTiles.length; index += 1) {
+      const current = activeTiles[index];
+
+      if (!current || used.has(current.id)) continue;
+
+      for (let nextIndex = index + 1; nextIndex < activeTiles.length; nextIndex += 1) {
+        const candidate = activeTiles[nextIndex];
+
+        if (!candidate || used.has(candidate.id)) continue;
+
+        if (canMatch(current, candidate)) {
+          used.add(current.id);
+          used.add(candidate.id);
+          pairs += 1;
+          break;
+        }
+      }
+    }
+
+    return pairs;
+  }, [gameState?.tiles, currentUser]);
+
+  const currentScore = currentUser?.score ?? 0;
+  const gameStatus = !isConnected ? 'Reconectando' : gameState?.isGameOver ? 'Finalizada' : 'Jugando';
+
+  const boardTiles = useMemo(
+    () =>
+      (gameState?.tiles ?? []).map((tile) => ({
+        ...tile,
+        isHinted: hintedTileIds.includes(tile.id) || Boolean(tile.isHinted),
+      })),
+    [gameState?.tiles, hintedTileIds],
+  );
+
   const scoreChartData = useMemo<ScorePoint[]>(() => {
     if (!gameState?.scoreHistory?.length) {
       return connectedPlayers.length
@@ -189,11 +255,77 @@ function App() {
     return () => window.clearInterval(interval);
   }, [gameState?.startTime, screen]);
 
-  const isSelectable = (tile: Tile) => {
-    if (tile.isMatched) return false;
-    if (!currentUser) return false;
+  useEffect(() => {
+    setHintedTileIds([]);
+  }, [gameState]);
 
-    return tile.lockedBy === null || tile.lockedBy === currentUser.id;
+  useEffect(() => {
+    if (!controlMessage) return;
+
+    const timeout = window.setTimeout(() => setControlMessage(''), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [controlMessage]);
+
+  const showControlMessage = (message: string) => {
+    setControlMessage(message);
+  };
+
+  const handleTileSelect = (tileId: number) => {
+    setHintedTileIds([]);
+    selectTile(tileId);
+  };
+
+  const handleResetGame = async () => {
+    setHintedTileIds([]);
+    const response = await resetGame();
+
+    if (!response.ok) {
+      showControlMessage(response.error ?? 'No se pudo reiniciar');
+    }
+  };
+
+  const handleShuffleGame = async () => {
+    setHintedTileIds([]);
+    const response = await shuffleGame();
+
+    if (!response.ok) {
+      showControlMessage(response.error ?? 'No se pudo mezclar');
+    }
+  };
+
+  const handleUndoMove = async () => {
+    setHintedTileIds([]);
+    const response = await undoMove();
+
+    if (!response.ok) {
+      showControlMessage(response.error ?? 'No hay movimientos para deshacer');
+    }
+  };
+
+  const handleHint = () => {
+    const activeTiles = (gameState?.tiles ?? []).filter((tile) => !tile.isMatched && isSelectable(tile));
+
+    for (let index = 0; index < activeTiles.length; index += 1) {
+      const current = activeTiles[index];
+      if (!current) continue;
+
+      for (let nextIndex = index + 1; nextIndex < activeTiles.length; nextIndex += 1) {
+        const candidate = activeTiles[nextIndex];
+        if (!candidate) continue;
+
+        const isMatch =
+          (current.category === 'seasons' && candidate.category === 'seasons') ||
+          (current.category === 'flowers' && candidate.category === 'flowers') ||
+          current.label === candidate.label;
+
+        if (isMatch) {
+          setHintedTileIds([current.id, candidate.id]);
+          return;
+        }
+      }
+    }
+
+    showControlMessage('No hay pistas disponibles');
   };
 
   if (screen !== 'playing') {
@@ -254,7 +386,7 @@ function App() {
           </div>
           <div className="game-chip">
             <span>Estado</span>
-            <strong>{!isConnected ? 'Reconectando' : gameState?.isGameOver ? 'Finalizada' : 'Jugando'}</strong>
+            <strong>{gameStatus}</strong>
           </div>
           <div className="game-chip">
             <span>Tiempo</span>
@@ -263,32 +395,80 @@ function App() {
         </div>
       </header>
 
-      <section className="game-table">
-        <div className="game-table__board">
-          <section className="panel controls-card">
-            <div className="panel__eyebrow">Controles</div>
-            <div className="controls-row">
-              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
-                Nuevo
-              </button>
-              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
-                Deshacer
-              </button>
-              <button className="control-button control-button--accent" type="button" disabled title="La lógica de pista no está expuesta en el frontend conectado actual">
-                Pista
-              </button>
-              <button className="control-button" type="button" disabled title="No disponible en la capa conectada actual">
-                Mezclar
-              </button>
-            </div>
-          </section>
+      <section className="game-layout">
+        <div className="game-layout__main">
+          <section className="game-table">
+            <div className="game-table__board">
+              <section className="panel controls-card">
+                <div className="panel__eyebrow">Controles</div>
+                {controlMessage ? <div className="controls-message">{controlMessage}</div> : null}
+                <div className="controls-row">
+                  <button
+                    className="control-button"
+                    type="button"
+                    onClick={handleResetGame}
+                    disabled={!isConnected}
+                  >
+                    Nuevo
+                  </button>
+                  <button
+                    className="control-button"
+                    type="button"
+                    onClick={handleUndoMove}
+                    disabled={!isConnected}
+                  >
+                    Deshacer
+                  </button>
+                  <button
+                    className="control-button control-button--accent"
+                    type="button"
+                    onClick={handleHint}
+                    disabled={!availablePairs}
+                  >
+                    Pista
+                  </button>
+                  <button
+                    className="control-button"
+                    type="button"
+                    onClick={handleShuffleGame}
+                    disabled={!isConnected || Boolean(gameState?.isGameOver)}
+                  >
+                    Mezclar
+                  </button>
+                </div>
+              </section>
 
-          <Board
-            tiles={gameState?.tiles ?? []}
-            onTileClick={selectTile}
-            isSelectable={isSelectable}
-            theme={activeTheme}
-          />
+              <Board
+                tiles={boardTiles}
+                onTileClick={handleTileSelect}
+                isSelectable={isSelectable}
+                theme={activeTheme}
+              />
+            </div>
+
+            <aside className="game-table__sidebar">
+              <Scoreboard players={standings} />
+
+              <section className="panel sidebar-card game-summary-card">
+                <div className="panel__eyebrow">Resumen</div>
+                <h2>Estado de partida</h2>
+                <div className="session-stats">
+                  <article className="session-stat">
+                    <span>Puntaje actual</span>
+                    <strong>{currentScore}</strong>
+                  </article>
+                  <article className="session-stat">
+                    <span>Jugadores conectados</span>
+                    <strong>{currentPlayers}</strong>
+                  </article>
+                  <article className="session-stat">
+                    <span>Parejas libres</span>
+                    <strong>{availablePairs}</strong>
+                  </article>
+                </div>
+              </section>
+            </aside>
+          </section>
 
           <LiveChart
             data={scoreChartData}
@@ -298,28 +478,6 @@ function App() {
 
           <RulesPanel />
         </div>
-
-        <aside className="game-table__sidebar">
-          <Scoreboard players={standings} />
-          <section className="panel sidebar-card">
-            <div className="panel__eyebrow">Sesion</div>
-            <h2>Mesa</h2>
-            <div className="ranking-list">
-              <article className="ranking-row">
-                <div className="ranking-row__identity">
-                  <span>Jugadores</span>
-                </div>
-                <strong>{currentPlayers}</strong>
-              </article>
-              <article className="ranking-row">
-                <div className="ranking-row__identity">
-                  <span>Conexion</span>
-                </div>
-                <strong>{isConnected ? 'Activa' : 'Perdida'}</strong>
-              </article>
-            </div>
-          </section>
-        </aside>
       </section>
     </main>
   );

@@ -5,6 +5,8 @@
 }
 
 .app-shell--game {
+  display: grid;
+  gap: 20px;
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 244, 214, 0.08), transparent 18%),
     radial-gradient(circle at 12% 14%, rgba(255, 255, 255, 0.04), transparent 18%),
@@ -65,12 +67,25 @@
   color: #fffaf0;
 }
 
-.game-table {
-  max-width: 1520px;
+.game-layout {
+  width: min(100%, 1760px);
   margin: 0 auto;
+}
+
+.game-layout__main {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(280px, 340px);
-  gap: 20px;
+  gap: 18px;
+}
+
+.game-layout__main > .panel {
+  width: 100%;
+}
+
+.game-table {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 23vw, 340px);
+  gap: 24px;
   align-items: start;
 }
 
@@ -91,9 +106,11 @@
 .game-table__sidebar {
   align-content: start;
   width: 100%;
-  max-width: 340px;
-  justify-self: end;
+  max-width: clamp(280px, 23vw, 340px);
+  justify-self: stretch;
   gap: 14px;
+  position: sticky;
+  top: 20px;
 }
 
 .topbar {
@@ -315,35 +332,38 @@
 
 .table-shell {
   width: 100%;
-  max-width: 980px;
+  max-width: none;
   justify-self: stretch;
-  padding: 10px;
-  border-radius: 24px;
+  padding: clamp(10px, 1.4vw, 16px);
+  border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(255, 233, 191, 0.06), transparent 18%),
+    linear-gradient(180deg, rgba(255, 233, 191, 0.08), transparent 16%),
     linear-gradient(180deg, #6a4120 0%, #4b2d15 48%, #2a1709 100%);
   box-shadow:
     0 28px 60px rgba(3, 12, 7, 0.42),
+    0 10px 24px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 240, 210, 0.1),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.22);
+    inset 0 -14px 24px rgba(0, 0, 0, 0.28);
 }
 
 .table-shell__frame {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 22px;
   min-height: 0;
-  height: 560px;
+  height: clamp(440px, 64vh, 760px);
   border: 3px solid rgba(8, 34, 20, 0.72);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 0 60px rgba(0, 0, 0, 0.16);
+    inset 0 0 110px rgba(0, 0, 0, 0.22),
+    inset 0 -18px 40px rgba(0, 0, 0, 0.22);
 }
 
 .table-shell__glow {
   position: absolute;
   inset: 0;
   background:
+    radial-gradient(circle at 50% 46%, rgba(255, 247, 224, 0.12), transparent 30%),
     radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--table-accent) 18%, transparent), transparent 28%),
     radial-gradient(circle at 80% 15%, rgba(255, 255, 255, 0.05), transparent 20%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
@@ -355,25 +375,25 @@
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 18px 18px 0;
+  padding: clamp(18px, 2vw, 28px);
   overflow: hidden;
   display: grid;
   place-items: center;
 }
 
 .board-scaler {
-  width: 100%;
+  position: relative;
   display: grid;
   place-items: center;
-  transform: scale(0.53);
-  transform-origin: center top;
 }
 
 .board-stage {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 1280px;
   height: 780px;
-  flex: none;
+  transition: transform 0.24s ease;
 }
 
 .board-stage__layout {
@@ -396,19 +416,116 @@
     opacity 0.18s ease;
 }
 
+.tile--available {
+  filter:
+    drop-shadow(0 10px 16px rgba(3, 10, 7, 0.2))
+    drop-shadow(0 0 8px rgba(110, 231, 183, 0.08));
+}
+
+.tile--available .tile__face {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 0 0 3px rgba(255, 250, 235, 0.82),
+    inset 0 -10px 16px rgba(221, 198, 148, 0.24),
+    0 4px 8px rgba(34, 25, 11, 0.16),
+    0 0 0 1px rgba(110, 231, 183, 0.12);
+}
+
 .tile:hover:not(.tile--blocked) {
-  transform: translateY(-6px);
-  filter: drop-shadow(0 16px 22px rgba(2, 8, 5, 0.28));
+  transform: translateY(-8px);
+  filter:
+    drop-shadow(0 18px 24px rgba(2, 8, 5, 0.3))
+    drop-shadow(0 0 16px rgba(110, 231, 183, 0.18));
 }
 
 .tile--selected {
-  transform: translateY(-12px) scale(1.04);
-  filter: drop-shadow(0 20px 28px rgba(10, 10, 6, 0.34));
+  transform: translateY(-14px) scale(1.05);
+  filter:
+    drop-shadow(0 22px 30px rgba(10, 10, 6, 0.36))
+    drop-shadow(0 0 18px rgba(245, 158, 11, 0.32));
+}
+
+.tile--selected .tile__face {
+  border-color: rgba(211, 156, 41, 0.95);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 0 0 3px rgba(255, 248, 226, 0.9),
+    inset 0 -10px 16px rgba(221, 198, 148, 0.24),
+    0 0 0 3px rgba(246, 190, 59, 0.38),
+    0 0 24px rgba(246, 190, 59, 0.24),
+    0 8px 16px rgba(34, 25, 11, 0.22);
 }
 
 .tile--blocked {
-  filter: grayscale(0.16) brightness(0.88) saturate(0.92);
+  filter:
+    grayscale(0.38)
+    brightness(0.78)
+    saturate(0.45)
+    contrast(0.92);
+  opacity: 0.92;
+}
+
+.tile--blocked .tile__shadow {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(26, 30, 27, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(10, 14, 11, 0.14), rgba(7, 10, 8, 0.36));
+}
+
+.tile--blocked .tile__depth {
+  background:
+    linear-gradient(180deg, rgba(248, 242, 225, 0.22), rgba(248, 242, 225, 0) 20%),
+    linear-gradient(135deg, #aca79b 0%, #9b9588 52%, #817a6e 100%);
+  box-shadow:
+    inset -2px -2px 0 rgba(71, 68, 60, 0.18),
+    inset 2px 2px 0 rgba(234, 229, 214, 0.24);
+}
+
+.tile--blocked .tile__face {
+  --tile-tint: rgba(116, 116, 116, 0.12);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.46), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 18%),
+    linear-gradient(180deg, var(--tile-tint), transparent 72%),
+    linear-gradient(180deg, #d3cdc1 0%, #b8b1a4 100%);
+  border-color: #8f8778;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 0 0 3px rgba(219, 213, 200, 0.58),
+    inset 0 -10px 16px rgba(101, 95, 84, 0.18),
+    0 2px 6px rgba(34, 25, 11, 0.12);
+}
+
+.tile--blocked .tile__face::before {
+  border-color: rgba(111, 105, 93, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(85, 80, 72, 0.12);
+}
+
+.tile--blocked .tile__face::after {
+  opacity: 0.28;
+}
+
+.tile--blocked .mahjong-glyph,
+.tile--blocked .mahjong-chinese,
+.tile--blocked .mahjong-dot,
+.tile--blocked .mahjong-bamboo-stick {
   opacity: 0.82;
+}
+
+.tile--blocked .mahjong-chinese--main,
+.tile--blocked .mahjong-chinese--red {
+  color: #8d5f5b;
+}
+
+.tile--blocked .mahjong-chinese--number,
+.tile--blocked .mahjong-chinese--green {
+  color: #607268;
+}
+
+.tile--blocked .mahjong-chinese--honor,
+.tile--blocked .mahjong-chinese--accent {
+  color: #555f78;
 }
 
 .tile--hinted .tile__face {
@@ -646,7 +763,6 @@
 
 .controls-card {
   width: 100%;
-  max-width: 980px;
   justify-self: stretch;
   background:
     linear-gradient(180deg, rgba(16, 39, 29, 0.82), rgba(9, 24, 18, 0.88));
@@ -658,6 +774,16 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
+}
+
+.controls-message {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(245, 190, 78, 0.1);
+  border: 1px solid rgba(245, 190, 78, 0.16);
+  color: #f8e5b0;
+  font-size: 0.9rem;
 }
 
 .control-button {
@@ -694,7 +820,6 @@
 
 .chart-card {
   width: 100%;
-  max-width: 980px;
   justify-self: stretch;
   background:
     linear-gradient(180deg, rgba(15, 32, 24, 0.82), rgba(8, 21, 16, 0.86));
@@ -795,19 +920,85 @@
   line-height: 1.55;
 }
 
-.game-table__board .sidebar-card {
+.session-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.session-stat {
+  min-height: 92px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(39, 49, 42, 0.74), rgba(28, 36, 31, 0.72));
+  border: 1px solid rgba(241, 234, 215, 0.08);
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.session-stat span,
+.session-status span {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #b8c4b9;
+}
+
+.session-stat strong {
+  font-size: 1.05rem;
+  color: #fff6de;
+}
+
+.session-status {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(245, 190, 78, 0.08);
+  border: 1px solid rgba(245, 190, 78, 0.16);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-status strong {
+  color: #f8e5b0;
+  font-size: 0.95rem;
+}
+
+.game-layout__main > .sidebar-card {
   width: 100%;
-  max-width: 980px;
   justify-self: stretch;
 }
 
-.game-table__board .sidebar-card .rules-list {
+.game-summary-card {
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(5, 33, 20, 0.94), rgba(4, 26, 17, 0.92));
+  border-color: rgba(241, 234, 215, 0.08);
+}
+
+.game-summary-card h2 {
+  font-size: clamp(1.2rem, 1.6vw, 1.7rem);
+}
+
+.game-summary-card .session-stats {
+  grid-template-columns: 1fr;
+  margin-top: 12px;
+}
+
+.game-layout__main > .sidebar-card .rules-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 22px;
   row-gap: 14px;
 }
 
 @media (max-width: 1200px) {
+  .game-layout__main {
+    gap: 16px;
+  }
+
   .game-table {
     grid-template-columns: 1fr;
     gap: 22px;
@@ -816,36 +1007,35 @@
   .game-table__sidebar {
     max-width: 100%;
     justify-self: stretch;
+    position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .table-shell {
-    width: 100%;
-    justify-self: stretch;
-  }
-
   .table-shell__frame {
-    height: 430px;
-  }
-
-  .board-scaler {
-    transform: scale(0.45);
+    height: clamp(380px, 58vw, 560px);
   }
 
   .controls-card,
   .chart-card,
-  .game-table__board .sidebar-card {
+  .game-layout__main > .sidebar-card {
     width: 100%;
     justify-self: stretch;
-    max-width: 100%;
+  }
+
+  .game-summary-card .session-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .controls-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .game-table__board .sidebar-card .rules-list {
+  .game-layout__main > .sidebar-card .rules-list {
     grid-template-columns: 1fr;
+  }
+
+  .session-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -879,17 +1069,8 @@
     grid-template-columns: 1fr;
   }
 
-  .table-shell {
-    width: 100%;
-    justify-self: stretch;
-  }
-
   .table-shell__frame {
-    height: 310px;
-  }
-
-  .board-scaler {
-    transform: scale(0.32);
+    height: clamp(270px, 78vw, 360px);
   }
 
   .chart-card__header {
@@ -903,5 +1084,15 @@
 
   .controls-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .session-stats,
+  .game-summary-card .session-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .session-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

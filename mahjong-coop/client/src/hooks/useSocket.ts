@@ -92,6 +92,45 @@ export const useSocket = () => {
     socketRef.current.emit("tile:select", tileId);
   };
 
+  const resetGame = (): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ ok: false, error: "Sin conexion" });
+        return;
+      }
+
+      socketRef.current.emit("game:reset", (response: { ok: boolean; error?: string }) => {
+        resolve(response ?? { ok: false, error: "No response" });
+      });
+    });
+  };
+
+  const shuffleGame = (): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ ok: false, error: "Sin conexion" });
+        return;
+      }
+
+      socketRef.current.emit("game:shuffle", (response: { ok: boolean; error?: string }) => {
+        resolve(response ?? { ok: false, error: "No response" });
+      });
+    });
+  };
+
+  const undoMove = (): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ ok: false, error: "Sin conexion" });
+        return;
+      }
+
+      socketRef.current.emit("game:undo", (response: { ok: boolean; error?: string }) => {
+        resolve(response ?? { ok: false, error: "No response" });
+      });
+    });
+  };
+
   const leaveRoom = () => {
     if (!socketRef.current) return;
 
@@ -108,6 +147,9 @@ export const useSocket = () => {
     createRoom,
     joinGame,
     selectTile,
+    resetGame,
+    shuffleGame,
+    undoMove,
     leaveRoom,
   };
 };

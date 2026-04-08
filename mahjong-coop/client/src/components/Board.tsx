@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import Tile from './Tile';
 import type { TableTheme, Tile as TileType } from '../types';
 
@@ -21,7 +21,38 @@ interface BoardProps {
 }
 
 function Board({ tiles, onTileClick, isSelectable, theme }: BoardProps) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [boardScale, setBoardScale] = useState(1);
   const activeTiles = tiles.filter((tile) => !tile.isMatched);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+
+    if (!frame) return;
+
+    const updateScale = () => {
+      const styles = window.getComputedStyle(frame);
+      const paddingX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const paddingY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+      const availableWidth = Math.max(frame.clientWidth - paddingX, 0);
+      const availableHeight = Math.max(frame.clientHeight - paddingY, 0);
+      const scale = Math.min(availableWidth / STAGE_WIDTH, availableHeight / STAGE_HEIGHT);
+
+      setBoardScale(Number.isFinite(scale) && scale > 0 ? Math.min(scale, 1) : 1);
+    };
+
+    updateScale();
+
+    const resizeObserver = new ResizeObserver(updateScale);
+    resizeObserver.observe(frame);
+
+    window.addEventListener('resize', updateScale);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
+  }, []);
 
   const metrics = activeTiles.reduce(
     (accumulator, tile) => {
@@ -75,9 +106,21 @@ function Board({ tiles, onTileClick, isSelectable, theme }: BoardProps) {
     <section className="table-shell" style={{ '--table-accent': theme.accent } as CSSProperties}>
       <div className="table-shell__frame" style={{ background: theme.background }}>
         <div className="table-shell__glow" />
-        <div className="board-canvas">
-          <div className="board-scaler">
-            <div className="board-stage">
+        <div className="board-canvas" ref={frameRef}>
+          <div
+            className="board-scaler"
+            style={{
+              width: `${STAGE_WIDTH * boardScale}px`,
+              height: `${STAGE_HEIGHT * boardScale}px`,
+            }}
+          >
+            <div
+              className="board-stage"
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: 'top left',
+              }}
+            >
               <div
                 className="board-stage__layout"
                 style={{ transform: `translate(${offsetX}px, ${offsetY}px)` }}

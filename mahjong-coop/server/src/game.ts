@@ -156,6 +156,18 @@ function clearTransientFlags(tile: Tile): Tile {
   };
 }
 
+function cloneGameState(state: GameState): GameState {
+  return {
+    ...state,
+    tiles: state.tiles.map((tile) => ({ ...tile })),
+    players: state.players.map((player) => ({ ...player })),
+    scoreHistory: state.scoreHistory.map((snapshot) => ({
+      timestamp: snapshot.timestamp,
+      scores: { ...snapshot.scores },
+    })),
+  };
+}
+
 function addScoreSnapshot(state: GameState): GameState {
   const snapshot: ScoreSnapshot = {
     timestamp: Date.now(),
@@ -184,6 +196,19 @@ function createGame(_pairCount: number): GameState {
     scoreHistory: [],
     isGameOver: false,
     startTime: null,
+  };
+}
+
+function resetGame(state: GameState): GameState {
+  const newGameState = createGame(15);
+
+  return {
+    ...newGameState,
+    players: state.players.map((player) => ({
+      ...player,
+      score: 0,
+      isConnected: player.isConnected,
+    })),
   };
 }
 
@@ -372,4 +397,39 @@ function checkGameOver(state: GameState): GameState {
   };
 }
 
-export { createGame, addPlayer, removePlayer, selectTile, checkMatch };
+function reshuffleTiles(state: GameState): GameState {
+  const activeTiles = state.tiles.filter((tile) => !tile.isMatched);
+  const shuffledSeeds = shuffle(
+    activeTiles.map(({ symbol, label, category, value }) => ({
+      symbol,
+      label,
+      category,
+      value,
+    })),
+  );
+
+  let seedIndex = 0;
+
+  return {
+    ...state,
+    tiles: state.tiles.map((tile) => {
+      if (tile.isMatched) {
+        return clearTransientFlags({ ...tile, lockedBy: null, isFlipped: false });
+      }
+
+      const nextSeed = shuffledSeeds[seedIndex]!;
+      seedIndex += 1;
+
+      return {
+        ...tile,
+        ...nextSeed,
+        lockedBy: null,
+        isFlipped: false,
+        isSelected: false,
+        isHinted: false,
+      };
+    }),
+  };
+}
+
+export { addPlayer, checkMatch, cloneGameState, createGame, removePlayer, resetGame, reshuffleTiles, selectTile };
