@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import Board from './components/Board';
 import LiveChart from './components/LiveChart';
 import Lobby from './components/Lobby';
@@ -36,8 +37,8 @@ function App() {
     roomId,
     createRoom,
     joinGame,
-    selectTile,
     startGame,
+    selectTile,
     resetGame,
     shuffleGame,
     undoMove,
@@ -57,6 +58,8 @@ function App() {
   const [hintedTileIds, setHintedTileIds] = useState<number[]>([]);
   const [controlMessage, setControlMessage] = useState('');
   const [lobbyMessage, setLobbyMessage] = useState('');
+  const [showVictoryOverlay, setShowVictoryOverlay] = useState(false);
+  const victoryTriggeredRef = useRef(false);
   const prevGameStateRef = useRef<typeof gameState | null>(null);
 
   const currentUser = gameState?.players.find((player) => player.id === socketId);
@@ -86,7 +89,7 @@ function App() {
     }, 100);
 
     return () => window.clearInterval(interval);
-  }, [screen]);
+  }, [screen, audio]);
 
   const handleConfirmName = () => {
     if (!tempName.trim()) return;
@@ -136,10 +139,11 @@ function App() {
     setInputCode('');
     setLoadingProgress(0);
     setLobbyMessage('');
+    setShowVictoryOverlay(false);
+    victoryTriggeredRef.current = false;
   };
 
   const handleCopyCode = async () => {
-
     audio.play('click');
 
     try {
@@ -159,6 +163,18 @@ function App() {
       isCurrentPlayer: player.id === socketId,
     }));
   }, [connectedPlayers, socketId]);
+
+  const finalRanking = useMemo(() => {
+    return [...connectedPlayers].sort((a, b) => b.score - a.score);
+  }, [connectedPlayers]);
+
+  const winner = finalRanking[0] ?? null;
+
+  const didCurrentUserWin = Boolean(
+    winner &&
+    currentUser &&
+    winner.id === currentUser.id,
+  );
 
   const chartPlayers = useMemo<Opponent[]>(
     () =>
@@ -237,14 +253,14 @@ function App() {
     if (!gameState?.scoreHistory?.length) {
       return connectedPlayers.length
         ? [
-          connectedPlayers.reduce<ScorePoint>(
-            (accumulator, player) => ({
-              ...accumulator,
-              [player.name]: player.score,
-            }),
-            { time: 0 },
-          ),
-        ]
+            connectedPlayers.reduce<ScorePoint>(
+              (accumulator, player) => ({
+                ...accumulator,
+                [player.name]: player.score,
+              }),
+              { time: 0 },
+            ),
+          ]
         : [];
     }
 
@@ -322,6 +338,24 @@ function App() {
     return () => window.clearTimeout(timeout);
   }, [controlMessage]);
 
+  useEffect(() => {
+    if (screen !== 'playing') {
+      setShowVictoryOverlay(false);
+      victoryTriggeredRef.current = false;
+      return;
+    }
+
+    if (gameState?.isGameOver) {
+      if (!victoryTriggeredRef.current) {
+        setShowVictoryOverlay(true);
+        victoryTriggeredRef.current = true;
+      }
+    } else {
+      setShowVictoryOverlay(false);
+      victoryTriggeredRef.current = false;
+    }
+  }, [gameState?.isGameOver, screen]);
+
   const showControlMessage = (message: string) => {
     setControlMessage(message);
   };
@@ -359,6 +393,21 @@ function App() {
 
     if (!response.ok) {
       showControlMessage(response.error ?? 'No hay movimientos para deshacer');
+    }
+  };
+
+  const handlePlayAgain = async () => {
+    audio.play('click');
+    setShowVictoryOverlay(false);
+    victoryTriggeredRef.current = false;
+    setHintedTileIds([]);
+
+    const response = await resetGame();
+
+    if (!response.ok) {
+      showControlMessage(response.error ?? 'No se pudo reiniciar');
+    } else if (gameState?.isStarted) {
+      audio.startMusic();
     }
   };
 
@@ -469,6 +518,345 @@ function App() {
           </div>
         </div>
       </header>
+
+      {showVictoryOverlay && winner ? (
+        <>
+          <style>
+            {`
+              @keyframes victoryFadeInInline {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+
+              @keyframes victoryPopInInline {
+                0% {
+                  opacity: 0;
+                  transform: scale(0.82) translateY(20px);
+                }
+                65% {
+                  opacity: 1;
+                  transform: scale(1.03) translateY(0);
+                }
+                100% {
+                  opacity: 1;
+                  transform: scale(1) translateY(0);
+                }
+              }
+
+              @keyframes confettiFallInline {
+                0% {
+                  transform: translateY(-14vh) rotate(0deg);
+                  opacity: 0;
+                }
+                10% {
+                  opacity: 1;
+                }
+                100% {
+                  transform: translateY(115vh) rotate(620deg);
+                  opacity: 1;
+                }
+              }
+            `}
+          </style>
+
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'radial-gradient(circle at 50% 30%, rgba(255, 225, 138, 0.18), transparent 20%), radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05), transparent 18%), rgba(3, 10, 7, 0.78)',
+                backdropFilter: 'blur(8px)',
+                animation: 'victoryFadeInInline 0.35s ease forwards',
+              }}
+            />
+
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            >
+              {Array.from({ length: 40 }).map((_, index) => {
+                const colors = [
+                  'linear-gradient(180deg, #fde68a, #f59e0b)',
+                  'linear-gradient(180deg, #fca5a5, #ef4444)',
+                  'linear-gradient(180deg, #93c5fd, #2563eb)',
+                  'linear-gradient(180deg, #86efac, #16a34a)',
+                  'linear-gradient(180deg, #f9a8d4, #db2777)',
+                ];
+
+                return (
+                  <span
+                    key={index}
+                    style={
+                      {
+                        position: 'absolute',
+                        top: '-12%',
+                        left: `${(index * 2.47) % 100}%`,
+                        width: `${10 + (index % 4)}px`,
+                        height: `${22 + (index % 3) * 6}px`,
+                        borderRadius: '999px',
+                        opacity: 0.95,
+                        background: colors[index % colors.length],
+                        boxShadow: '0 0 10px rgba(245, 190, 78, 0.18)',
+                        animationName: 'confettiFallInline',
+                        animationTimingFunction: 'linear',
+                        animationIterationCount: 'infinite',
+                        animationDelay: `${(index % 12) * 0.12}s`,
+                        animationDuration: `${3.6 + (index % 6) * 0.35}s`,
+                      } as CSSProperties
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            <section
+              className="panel"
+              style={{
+                position: 'relative',
+                zIndex: 2,
+                width: 'min(760px, calc(100vw - 32px))',
+                maxWidth: '760px',
+                borderRadius: '30px',
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 232, 176, 0.22)',
+                background: 'linear-gradient(180deg, rgba(23, 44, 32, 0.97), rgba(8, 20, 14, 0.98))',
+                boxShadow:
+                  '0 30px 80px rgba(0, 0, 0, 0.48), 0 0 40px rgba(245, 190, 78, 0.14), inset 0 1px 0 rgba(255, 250, 235, 0.08)',
+                animation: 'victoryPopInInline 0.5s cubic-bezier(0.2, 0.9, 0.2, 1) forwards',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  background:
+                    'radial-gradient(circle at 50% 0%, rgba(255, 215, 92, 0.24), transparent 34%), radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.05), transparent 20%)',
+                }}
+              />
+
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 3,
+                  padding: '32px',
+                  display: 'grid',
+                  gap: '18px',
+                }}
+              >
+                <div
+                  style={{
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.2em',
+                    fontSize: '0.72rem',
+                    color: '#f4d58b',
+                  }}
+                >
+                  Partida finalizada
+                </div>
+
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 'clamp(2rem, 4vw, 3.3rem)',
+                    lineHeight: 1,
+                    color: '#fff7dd',
+                    textShadow: '0 0 18px rgba(245, 190, 78, 0.18)',
+                  }}
+                >
+                  {didCurrentUserWin ? '¡Ganaste!' : `Victoria de ${winner.name}`}
+                </h2>
+
+                <p
+                  style={{
+                    margin: 0,
+                    color: '#dde7d8',
+                    fontSize: '1rem',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {didCurrentUserWin
+                    ? 'Terminaste en el primer lugar del ranking.'
+                    : `${winner.name} terminó en el primer lugar.`}
+                </p>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  <article
+                    style={{
+                      minHeight: '94px',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      background: 'rgba(255, 248, 230, 0.05)',
+                      border: '1px solid rgba(255, 232, 176, 0.08)',
+                      display: 'grid',
+                      alignContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.13em', color: '#c6d1c3' }}>
+                      Ganador
+                    </span>
+                    <strong style={{ fontSize: '1.08rem', color: '#fff4cf' }}>{winner.name}</strong>
+                  </article>
+
+                  <article
+                    style={{
+                      minHeight: '94px',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      background: 'rgba(255, 248, 230, 0.05)',
+                      border: '1px solid rgba(255, 232, 176, 0.08)',
+                      display: 'grid',
+                      alignContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.13em', color: '#c6d1c3' }}>
+                      Puntaje ganador
+                    </span>
+                    <strong style={{ fontSize: '1.08rem', color: '#fff4cf' }}>{winner.score}</strong>
+                  </article>
+
+                  <article
+                    style={{
+                      minHeight: '94px',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      background: 'rgba(255, 248, 230, 0.05)',
+                      border: '1px solid rgba(255, 232, 176, 0.08)',
+                      display: 'grid',
+                      alignContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.13em', color: '#c6d1c3' }}>
+                      Tu puntaje
+                    </span>
+                    <strong style={{ fontSize: '1.08rem', color: '#fff4cf' }}>{currentUser?.score ?? 0}</strong>
+                  </article>
+
+                  <article
+                    style={{
+                      minHeight: '94px',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      background: 'rgba(255, 248, 230, 0.05)',
+                      border: '1px solid rgba(255, 232, 176, 0.08)',
+                      display: 'grid',
+                      alignContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.13em', color: '#c6d1c3' }}>
+                      Tiempo total
+                    </span>
+                    <strong style={{ fontSize: '1.08rem', color: '#fff4cf' }}>
+                      {new Date(elapsedSeconds * 1000).toISOString().slice(14, 19)}
+                    </strong>
+                  </article>
+                </div>
+
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  <div
+                    style={{
+                      fontSize: '0.88rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.15em',
+                      color: '#e8c57b',
+                    }}
+                  >
+                    Ranking final
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    {finalRanking.map((player, index) => (
+                      <article
+                        key={player.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          background:
+                            currentUser?.id === player.id
+                              ? 'rgba(245, 158, 11, 0.16)'
+                              : 'rgba(39, 49, 42, 0.72)',
+                          border:
+                            currentUser?.id === player.id
+                              ? '1px solid rgba(245, 158, 11, 0.22)'
+                              : '1px solid transparent',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ color: '#9fb0a3' }}>#{index + 1}</span>
+                          <span
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '999px',
+                              backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
+                              display: 'inline-block',
+                            }}
+                          />
+                          <span>{player.name}</span>
+                        </div>
+                        <strong>{player.score}</strong>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginTop: '6px',
+                  }}
+                >
+                  <button
+                    className="button button--primary"
+                    type="button"
+                    onClick={handlePlayAgain}
+                    style={{
+                      minWidth: '220px',
+                      minHeight: '52px',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    Jugar otra vez
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </>
+      ) : null}
 
       <section className="game-layout">
         <div className="game-layout__main">

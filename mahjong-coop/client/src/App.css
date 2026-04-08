@@ -1095,4 +1095,273 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .victory-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  overflow: hidden !important;
+}
+
+.victory-overlay__backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 225, 138, 0.18), transparent 20%),
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05), transparent 18%),
+    rgba(3, 10, 7, 0.76) !important;
+  backdrop-filter: blur(8px) !important;
+  animation: victoryFadeIn 0.35s ease forwards !important;
+}
+
+.victory-modal {
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-width: 760px !important;
+  border-radius: 30px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 232, 176, 0.22) !important;
+  background: linear-gradient(180deg, rgba(23, 44, 32, 0.97), rgba(8, 20, 14, 0.98)) !important;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.48),
+    0 0 40px rgba(245, 190, 78, 0.14),
+    inset 0 1px 0 rgba(255, 250, 235, 0.08) !important;
+  animation: victoryPopIn 0.5s cubic-bezier(0.2, 0.9, 0.2, 1) forwards !important;
+}
+
+.victory-modal__glow {
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 215, 92, 0.24), transparent 34%),
+    radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.05), transparent 20%) !important;
+}
+
+.victory-modal__content {
+  position: relative !important;
+  z-index: 3 !important;
+  padding: 32px !important;
+  display: grid !important;
+  gap: 18px !important;
+}
+
+.victory-modal__eyebrow {
+  text-transform: uppercase !important;
+  letter-spacing: 0.2em !important;
+  font-size: 0.72rem !important;
+  color: #f4d58b !important;
+}
+
+.victory-modal__title {
+  margin: 0 !important;
+  font-size: clamp(2rem, 4vw, 3.3rem) !important;
+  line-height: 1 !important;
+  color: #fff7dd !important;
+  text-shadow: 0 0 18px rgba(245, 190, 78, 0.18) !important;
+}
+
+.victory-modal__subtitle {
+  margin: 0 !important;
+  color: #dde7d8 !important;
+  font-size: 1rem !important;
+  line-height: 1.6 !important;
+}
+
+.victory-modal__stats {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.victory-stat {
+  min-height: 94px !important;
+  padding: 14px !important;
+  border-radius: 16px !important;
+  background: rgba(255, 248, 230, 0.05) !important;
+  border: 1px solid rgba(255, 232, 176, 0.08) !important;
+  display: grid !important;
+  align-content: center !important;
+  gap: 6px !important;
+}
+
+.victory-stat span {
+  font-size: 0.68rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.13em !important;
+  color: #c6d1c3 !important;
+}
+
+.victory-stat strong {
+  font-size: 1.08rem !important;
+  color: #fff4cf !important;
+}
+
+.victory-ranking {
+  display: grid !important;
+  gap: 12px !important;
+}
+
+.victory-ranking__title {
+  font-size: 0.88rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.15em !important;
+  color: #e8c57b !important;
+}
+
+.victory-ranking__list {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.victory-ranking__row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px 14px !important;
+  border-radius: 16px !important;
+  background: rgba(39, 49, 42, 0.72) !important;
+  border: 1px solid transparent !important;
+}
+
+.victory-ranking__row--me {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.22) !important;
+}
+
+.victory-ranking__identity {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.victory-ranking__place {
+  color: #9fb0a3 !important;
+}
+
+.victory-ranking__dot {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 999px !important;
+}
+
+.victory-modal__actions {
+  display: flex !important;
+  justify-content: center !important;
+  margin-top: 6px !important;
+}
+
+.victory-modal__button {
+  min-width: 220px !important;
+  min-height: 52px !important;
+  font-size: 1rem !important;
+}
+
+.victory-confetti {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+}
+
+.victory-confetti__piece {
+  position: absolute !important;
+  top: -12% !important;
+  width: 12px !important;
+  height: 28px !important;
+  border-radius: 999px !important;
+  opacity: 0.95 !important;
+  background: linear-gradient(180deg, #fde68a, #f59e0b) !important;
+  box-shadow: 0 0 10px rgba(245, 190, 78, 0.2) !important;
+  animation: confettiFall linear infinite !important;
+}
+
+.victory-confetti__piece:nth-child(4n) {
+  background: linear-gradient(180deg, #fca5a5, #ef4444) !important;
+}
+
+.victory-confetti__piece:nth-child(4n + 1) {
+  background: linear-gradient(180deg, #93c5fd, #2563eb) !important;
+}
+
+.victory-confetti__piece:nth-child(4n + 2) {
+  background: linear-gradient(180deg, #86efac, #16a34a) !important;
+}
+
+.victory-confetti__piece:nth-child(4n + 3) {
+  background: linear-gradient(180deg, #f9a8d4, #db2777) !important;
+}
+
+@keyframes victoryFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes victoryPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(20px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.03) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-12vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(112vh) rotate(540deg);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 860px) {
+  .victory-modal__content {
+    padding: 24px !important;
+  }
+
+  .victory-modal__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .victory-overlay {
+    padding: 14px !important;
+  }
+
+  .victory-modal__content {
+    padding: 20px !important;
+  }
+
+  .victory-modal__stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  .victory-modal__title {
+    font-size: 2rem !important;
+  }
+
+  .victory-modal__button {
+    width: 100% !important;
+  }
+}
 }
