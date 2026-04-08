@@ -7,6 +7,7 @@ import {
   resetGame,
   reshuffleTiles,
   selectTile,
+  startGame,
 } from "./game";
 import type { GameState } from "./types";
 
@@ -83,7 +84,12 @@ export function setupSocket(io: SocketIOServer): void {
   io.on("connection", (socket: Socket) => {
     console.log(`[CONNECT] Socket ${socket.id} conectado`);
 
-    socket.on("room:create", (callback?: (data: { roomId: string }) => void) => {
+    socket.on(
+      "room:create",
+      (
+        payload?: { maxPlayers?: number },
+        callback?: (data: { roomId: string }) => void,
+      ) => {
       const oldRoomId = socket.data.roomId as string | undefined;
 
       if (oldRoomId && rooms[oldRoomId]) {
@@ -94,7 +100,8 @@ export function setupSocket(io: SocketIOServer): void {
       }
 
       const roomId = ensureUniqueRoomId();
-      rooms[roomId] = createGame(15);
+      const maxPlayers = Math.max(1, Math.min(4, payload?.maxPlayers ?? 2));
+      rooms[roomId] = createGame(15, maxPlayers);
       roomHistory[roomId] = [];
 
       socket.join(roomId);
@@ -105,7 +112,8 @@ export function setupSocket(io: SocketIOServer): void {
       callback?.({ roomId });
 
       console.log(`[${roomId}] Sala creada por ${socket.id}`);
-    });
+      },
+    );
 
     const handleRoomJoin = (
       payload: { roomId: string; name: string } | string,
@@ -125,6 +133,13 @@ export function setupSocket(io: SocketIOServer): void {
       if (!rooms[roomId]) {
         callback?.({ ok: false, error: "Sala no encontrada" });
         console.log(`[${roomId}] Intento de union fallido: sala no existe`);
+        return;
+      }
+
+      const connectedPlayers = rooms[roomId].players.filter((player) => player.isConnected);
+      if (connectedPlayers.length >= rooms[roomId].maxPlayers) {
+        callback?.({ ok: false, error: "La sala ya esta llena" });
+        console.log(`[${roomId}] Intento de union fallido: sala llena`);
         return;
       }
 
@@ -201,6 +216,31 @@ export function setupSocket(io: SocketIOServer): void {
       roomHistory[roomId] = [];
       rooms[roomId] = resetGame(rooms[roomId]);
       broadcastRoomState(io, roomId);
+      callback?.({ ok: true });
+    });
+
+    socket.on("game:start", (callback?: (data: { ok: boolean; error?: string }) => void) => {
+      const roomId = socket.data.roomId as string | undefined;
+
+      if (!roomId || !rooms[roomId]) {
+        callback?.({ ok: false, error: "No estas en una sala valida" });
+        return;
+      }
+
+      if (rooms[roomId].hostId !== socket.id) {
+        callback?.({ ok: false, error: "Solo el anfitrion puede iniciar" });
+        return;
+      }
+
+      const connectedPlayers = rooms[roomId].players.filter((player) => player.isConnected);
+      if (connectedPlayers.length < rooms[roomId].maxPlayers) {
+        callback?.({ ok: false, error: "Faltan jugadores para iniciar" });
+        return;
+      }
+
+      rooms[roomId] = startGame(rooms[roomId]);
+      broadcastRoomState(io, roomId);
+      io.to(roomId).emit("game:started", { roomId });
       callback?.({ ok: true });
     });
 

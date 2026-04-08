@@ -14,7 +14,6 @@ export const useSocket = () => {
   const [socketId, setSocketId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Solo crear el socket si no existe
     if (!socketRef.current) {
       const socket = io(SERVER_URL);
       socketRef.current = socket;
@@ -39,7 +38,7 @@ export const useSocket = () => {
     }
   }, []);
 
-  const createRoom = (): Promise<string> => {
+  const createRoom = (maxPlayers: number): Promise<string> => {
     return new Promise((resolve) => {
       if (!socketRef.current) {
         resolve(DEFAULT_ROOM_ID);
@@ -48,6 +47,7 @@ export const useSocket = () => {
 
       socketRef.current.emit(
         "room:create",
+        { maxPlayers },
         (response: { roomId: string }) => {
           const nextRoomId = response.roomId.toUpperCase();
           setRoomId(nextRoomId);
@@ -131,6 +131,19 @@ export const useSocket = () => {
     });
   };
 
+  const startGame = (): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ ok: false, error: "Sin conexion" });
+        return;
+      }
+
+      socketRef.current.emit("game:start", (response: { ok: boolean; error?: string }) => {
+        resolve(response ?? { ok: false, error: "No response" });
+      });
+    });
+  };
+
   const leaveRoom = () => {
     if (!socketRef.current) return;
 
@@ -147,6 +160,7 @@ export const useSocket = () => {
     createRoom,
     joinGame,
     selectTile,
+    startGame,
     resetGame,
     shuffleGame,
     undoMove,

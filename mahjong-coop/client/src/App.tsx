@@ -37,6 +37,7 @@ function App() {
     createRoom,
     joinGame,
     selectTile,
+    startGame,
     resetGame,
     shuffleGame,
     undoMove,
@@ -55,6 +56,7 @@ function App() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hintedTileIds, setHintedTileIds] = useState<number[]>([]);
   const [controlMessage, setControlMessage] = useState('');
+  const [lobbyMessage, setLobbyMessage] = useState('');
   const prevGameStateRef = useRef<typeof gameState | null>(null);
 
   const currentUser = gameState?.players.find((player) => player.id === socketId);
@@ -98,11 +100,14 @@ function App() {
 
     audio.play('click');
 
-    const nextRoomCode = await createRoom();
+    const nextRoomCode = await createRoom(playerCount);
     const response = await joinGame(playerName, nextRoomCode);
 
     if (response.ok) {
       setScreen('lobby');
+      setLobbyMessage('');
+    } else {
+      setLobbyMessage('No se pudo crear la sala');
     }
   };
 
@@ -115,7 +120,10 @@ function App() {
     const response = await joinGame(playerName, normalizedCode);
 
     if (response.ok) {
-      setScreen('loading');
+      setScreen('lobby');
+      setLobbyMessage('');
+    } else {
+      setLobbyMessage('No se pudo unir a la sala');
     }
   };
 
@@ -127,6 +135,7 @@ function App() {
     setRoomName('');
     setInputCode('');
     setLoadingProgress(0);
+    setLobbyMessage('');
   };
 
   const handleCopyCode = async () => {
@@ -254,6 +263,12 @@ function App() {
   }, [connectedPlayers, gameState?.scoreHistory, gameState?.startTime]);
 
   useEffect(() => {
+    if (screen === 'lobby' && gameState?.isStarted) {
+      setScreen('loading');
+    }
+  }, [gameState?.isStarted, screen]);
+
+  useEffect(() => {
     if (screen !== 'playing' || !gameState?.startTime) {
       setElapsedSeconds(0);
       return;
@@ -373,6 +388,17 @@ function App() {
     showControlMessage('No hay pistas disponibles');
   };
 
+  const handleStartMatch = async () => {
+    audio.play('click');
+    const response = await startGame();
+
+    if (!response.ok) {
+      setLobbyMessage(response.error ?? 'No se pudo iniciar la partida');
+    } else {
+      setLobbyMessage('');
+    }
+  };
+
   if (screen !== 'playing') {
     return (
       <main className="app-shell app-shell--lobby">
@@ -407,11 +433,9 @@ function App() {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onCopyCode={handleCopyCode}
-          onStartMatch={() => {
-            audio.play('click');
-            setScreen('loading');
-          }}
+          onStartMatch={handleStartMatch}
           onBackToMenu={handleBackToMenu}
+          lobbyMessage={lobbyMessage}
         />
       </main>
     );

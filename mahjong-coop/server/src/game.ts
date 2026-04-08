@@ -182,7 +182,7 @@ function addScoreSnapshot(state: GameState): GameState {
   };
 }
 
-function createGame(_pairCount: number): GameState {
+function createGame(_pairCount: number, maxPlayers = 2): GameState {
   const shuffledSeeds = shuffle(MAHJONG_TILE_SEEDS);
   const positions = getClassicTurtlePositions();
 
@@ -196,11 +196,14 @@ function createGame(_pairCount: number): GameState {
     scoreHistory: [],
     isGameOver: false,
     startTime: null,
+    maxPlayers,
+    hostId: null,
+    isStarted: false,
   };
 }
 
 function resetGame(state: GameState): GameState {
-  const newGameState = createGame(15);
+  const newGameState = createGame(15, state.maxPlayers);
 
   return {
     ...newGameState,
@@ -209,6 +212,9 @@ function resetGame(state: GameState): GameState {
       score: 0,
       isConnected: player.isConnected,
     })),
+    hostId: state.hostId,
+    isStarted: false,
+    startTime: null,
   };
 }
 
@@ -236,7 +242,7 @@ function addPlayer(state: GameState, id: string, name: string): GameState {
   return {
     ...state,
     players: [...state.players, newPlayer],
-    startTime: state.startTime ?? Date.now(),
+    hostId: state.hostId ?? id,
   };
 }
 
@@ -432,4 +438,22 @@ function reshuffleTiles(state: GameState): GameState {
   };
 }
 
-export { addPlayer, checkMatch, cloneGameState, createGame, removePlayer, resetGame, reshuffleTiles, selectTile };
+function startGame(state: GameState): GameState {
+  return {
+    ...state,
+    isStarted: true,
+    startTime: state.startTime ?? Date.now(),
+  };
+}
+
+export {
+  addPlayer,
+  checkMatch,
+  cloneGameState,
+  createGame,
+  removePlayer,
+  resetGame,
+  reshuffleTiles,
+  selectTile,
+  startGame,
+};

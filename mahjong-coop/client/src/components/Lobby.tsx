@@ -15,6 +15,7 @@ interface LobbyProps {
   currentPlayers: number;
   loadingProgress: number;
   isCopied: boolean;
+  lobbyMessage?: string;
   onConfirmName: () => void;
   onSelectCreate: () => void;
   onSelectJoin: () => void;
@@ -42,6 +43,7 @@ function Lobby({
   currentPlayers,
   loadingProgress,
   isCopied,
+  lobbyMessage,
   onConfirmName,
   onSelectCreate,
   onSelectJoin,
@@ -196,6 +198,7 @@ function Lobby({
         >
           Iniciar partida
         </button>
+        {lobbyMessage ? <p>{lobbyMessage}</p> : null}
         <button className="button button--ghost" onClick={onBackToMenu}>
           Cancelar
         </button>

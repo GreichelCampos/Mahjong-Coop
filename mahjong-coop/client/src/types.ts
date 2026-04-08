@@ -72,4 +72,7 @@ export interface GameState {
   scoreHistory: ScoreSnapshot[];
   isGameOver: boolean;
   startTime: number | null;
+  maxPlayers: number;
+  hostId: string | null;
+  isStarted: boolean;
 }
