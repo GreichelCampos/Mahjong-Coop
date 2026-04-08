@@ -176,8 +176,11 @@ Actualmente el proyecto incluye:
 
 ## Integrantes
 
-- Nombre del integrante 1
-- Nombre del integrante 2
-- Nombre del integrante 3
-- Nombre del integrante 4
-- Nombre del integrante 5
+- Greichel Campos
+- Massiel Valverde
+- Tamara Gamboa
+- Darien Arroyo
+- Andres Mora
+
+
+Deployment update
