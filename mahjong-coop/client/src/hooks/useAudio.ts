@@ -161,10 +161,10 @@ const BASS_LOOP: NoteEvent[] = [
 ];
 
 const CHORD_LOOP: NoteEvent[][] = [
-  [[293.7, Q], [349.2, Q], [440.0, Q]],   // Dm
-  [[440.0, Q], [523.3, Q], [659.3, Q]],   // Am
-  [[392.0, Q], [466.2, Q], [587.3, Q]],   // Gm
-  [[293.7, Q], [349.2, Q], [440.0, Q]],   // Dm
+  [[293.7, Q], [349.2, Q], [440.0, Q]],   
+  [[440.0, Q], [523.3, Q], [659.3, Q]],   
+  [[392.0, Q], [466.2, Q], [587.3, Q]], 
+  [[293.7, Q], [349.2, Q], [440.0, Q]],   
 ];
 
 function createReverb(ctx: AudioContext, destination: AudioNode): AudioNode {
@@ -236,7 +236,6 @@ export function useAudio() {
   const volumeRef         = useRef(0.7);
   const isMusicPlayingRef = useRef(false);
 
-  // Contadores del secuenciador
   const melodyIdxRef   = useRef(0);
   const bassIdxRef     = useRef(0);
   const chordIdxRef    = useRef(0);
@@ -285,7 +284,7 @@ export function useAudio() {
     [getCtx]
   );
 
-  const tick = useCallback(() => {
+  const tick = useCallback(function tick() {
     if (!isMusicPlayingRef.current) return;
 
     const audio = getCtx();
@@ -301,7 +300,6 @@ export function useAudio() {
       const [freq, dur] = MELODY[melodyIdxRef.current]!;
       if (freq !== null) {
         scheduleNote(ctx, musicGain, "triangle", freq, melodyTimeRef.current, dur * 0.9, 0.11, 1800);
-        // Armónico sutil una octava arriba (brillo de ocarina)
         scheduleNote(ctx, musicGain, "sine", freq * 2, melodyTimeRef.current, dur * 0.6, 0.022, 3200);
       }
       melodyTimeRef.current += dur;
