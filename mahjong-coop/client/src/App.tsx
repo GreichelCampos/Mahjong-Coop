@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import Board from './components/Board';
 import LiveChart from './components/LiveChart';
 import Lobby from './components/Lobby';
 import RulesPanel from './components/RulesPanel';
 import Scoreboard from './components/Scoreboard';
 import { useSocket } from './hooks/useSocket';
+import { useAudio } from './hooks/useAudio';
 import { isSelectable as isMahjongSelectable } from './lib/mahjong';
 import type {
   Opponent,
@@ -26,6 +27,8 @@ const DEFAULT_THEME: TableTheme = {
 const PLAYER_COLORS = ['#38bdf8', '#f97316', '#22c55e', '#a78bfa', '#f43f5e'];
 
 function App() {
+  const audio = useAudio();
+
   const {
     gameState,
     isConnected,
@@ -52,6 +55,7 @@ function App() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hintedTileIds, setHintedTileIds] = useState<number[]>([]);
   const [controlMessage, setControlMessage] = useState('');
+  const prevGameStateRef = useRef<typeof gameState | null>(null);
 
   const currentUser = gameState?.players.find((player) => player.id === socketId);
   const connectedPlayers = useMemo(
@@ -71,6 +75,7 @@ function App() {
         if (previous >= 100) {
           window.clearInterval(interval);
           setScreen('playing');
+          audio.startMusic();
           return 100;
         }
 
@@ -83,13 +88,15 @@ function App() {
 
   const handleConfirmName = () => {
     if (!tempName.trim()) return;
-
+    audio.play('click');
     setPlayerName(tempName.trim());
     setScreen('menu');
   };
 
   const handleCreateRoom = async () => {
     if (!playerName.trim() || !roomName.trim()) return;
+
+    audio.play('click');
 
     const nextRoomCode = await createRoom();
     const response = await joinGame(playerName, nextRoomCode);
@@ -102,6 +109,8 @@ function App() {
   const handleJoinRoom = async () => {
     if (!playerName.trim() || inputCode.trim().length !== 6) return;
 
+    audio.play('click');
+
     const normalizedCode = inputCode.trim().toUpperCase();
     const response = await joinGame(playerName, normalizedCode);
 
@@ -111,7 +120,9 @@ function App() {
   };
 
   const handleBackToMenu = () => {
+    audio.play('click');
     leaveRoom();
+    audio.stopMusic();
     setScreen('menu');
     setRoomName('');
     setInputCode('');
@@ -119,6 +130,9 @@ function App() {
   };
 
   const handleCopyCode = async () => {
+
+    audio.play('click');
+
     try {
       await navigator.clipboard.writeText(roomId);
       setIsCopied(true);
@@ -213,14 +227,14 @@ function App() {
     if (!gameState?.scoreHistory?.length) {
       return connectedPlayers.length
         ? [
-            connectedPlayers.reduce<ScorePoint>(
-              (accumulator, player) => ({
-                ...accumulator,
-                [player.name]: player.score,
-              }),
-              { time: 0 },
-            ),
-          ]
+          connectedPlayers.reduce<ScorePoint>(
+            (accumulator, player) => ({
+              ...accumulator,
+              [player.name]: player.score,
+            }),
+            { time: 0 },
+          ),
+        ]
         : [];
     }
 
@@ -256,6 +270,32 @@ function App() {
   }, [gameState?.startTime, screen]);
 
   useEffect(() => {
+    if (!gameState) return;
+
+    const prev = prevGameStateRef.current;
+
+    if (prev) {
+      const newMatches = gameState.tiles.filter(
+        (t) => t.isMatched && !prev.tiles.find((p) => p.id === t.id)?.isMatched
+      );
+      if (newMatches.length > 0) {
+        audio.play('match');
+      }
+
+      if (gameState.players.length > prev.players.length) {
+        audio.play('join');
+      }
+
+      if (!prev.isGameOver && gameState.isGameOver) {
+        audio.stopMusic();
+        audio.play('victory');
+      }
+    }
+
+    prevGameStateRef.current = gameState;
+  }, [gameState, audio]);
+
+  useEffect(() => {
     setHintedTileIds([]);
   }, [gameState]);
 
@@ -272,10 +312,12 @@ function App() {
 
   const handleTileSelect = (tileId: number) => {
     setHintedTileIds([]);
+    audio.play('flip');
     selectTile(tileId);
   };
 
   const handleResetGame = async () => {
+    audio.play('click');
     setHintedTileIds([]);
     const response = await resetGame();
 
@@ -285,6 +327,7 @@ function App() {
   };
 
   const handleShuffleGame = async () => {
+    audio.play('shuffle');
     setHintedTileIds([]);
     const response = await shuffleGame();
 
@@ -294,6 +337,7 @@ function App() {
   };
 
   const handleUndoMove = async () => {
+    audio.play('undo');
     setHintedTileIds([]);
     const response = await undoMove();
 
@@ -303,6 +347,7 @@ function App() {
   };
 
   const handleHint = () => {
+    audio.play('click');
     const activeTiles = (gameState?.tiles ?? []).filter((tile) => !tile.isMatched && isSelectable(tile));
 
     for (let index = 0; index < activeTiles.length; index += 1) {
@@ -348,11 +393,13 @@ function App() {
           isCopied={isCopied}
           onConfirmName={handleConfirmName}
           onSelectCreate={() => {
+            audio.play('click');
             setRoomName('');
             setInputCode('');
             setScreen('matchmaking');
           }}
           onSelectJoin={() => {
+            audio.play('click');
             setRoomName('');
             setInputCode('');
             setScreen('matchmaking');
@@ -360,7 +407,10 @@ function App() {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onCopyCode={handleCopyCode}
-          onStartMatch={() => setScreen('loading')}
+          onStartMatch={() => {
+            audio.play('click');
+            setScreen('loading');
+          }}
           onBackToMenu={handleBackToMenu}
         />
       </main>
