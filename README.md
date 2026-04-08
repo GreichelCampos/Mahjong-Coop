@@ -120,6 +120,25 @@ Aplicación disponible en:
 http://localhost:5173
 ```
 
+## Variables de entorno
+
+### Frontend (`mahjong-coop/client`)
+
+Crear un archivo `.env`:
+
+```bash
+VITE_SERVER_URL=http://localhost:3000
+```
+
+### Backend (`mahjong-coop/server`)
+
+Crear un archivo `.env` o configurar variables del entorno:
+
+```bash
+CLIENT_URL=http://localhost:5173
+PORT=3000
+```
+
 ## Scripts útiles
 
 ### Cliente
@@ -173,6 +192,21 @@ Actualmente el proyecto incluye:
 - notificaciones visuales cuando una ficha se desbloquea
 - despliegue en producción
 - reconexión avanzada con restauración de sesión
+
+## Despliegue sugerido
+
+### Frontend en Vercel
+
+- importar el repositorio en Vercel
+- seleccionar como Root Directory: `mahjong-coop/client`
+- configurar la variable `VITE_SERVER_URL` con la URL pública del backend en Railway
+
+### Backend en Railway
+
+- crear un servicio desde el repositorio
+- seleccionar como Root Directory: `mahjong-coop/server`
+- configurar la variable `CLIENT_URL` con la URL pública del frontend en Vercel
+- Railway asigna automáticamente `PORT`
 
 ## Integrantes
 

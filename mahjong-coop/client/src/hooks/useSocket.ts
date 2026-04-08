@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { GameState } from "../types";
 
-const SERVER_URL = "http://localhost:3000";
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
 const DEFAULT_ROOM_ID = "GLOBAL";
 
 export const useSocket = () => {
